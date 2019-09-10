@@ -771,6 +771,61 @@ def shape_detect(c):
     return shape
 
 
+
+
+
+
+def full_imageProcess(ArrayDicom_o,dx,dy,title):  #process a full image
+    ArrayDicom = u.norm01(ArrayDicom_o)
+    height = np.shape(ArrayDicom)[0]
+    width = np.shape(ArrayDicom)[1]
+
+    blobs_log = blob_log(ArrayDicom, min_sigma=1, max_sigma=5, num_sigma=20,
+                         threshold=0.15)  # run on windows, for some stupid reason exclude_border is not recognized in my distro at home
+
+    center = []
+    point_det = []
+    for blob in blobs_log:
+        y, x, r = blob
+        point_det.append((x, y, r))
+
+    point_det = sorted(point_det, key=itemgetter(2), reverse=True)  # here we sort by the radius of the dot
+
+    # we need to find the centre dot as well as the larger dots on the sides of the image
+
+    # for j in range(0, len(point_det)):
+    #     x, y, r = point_det[j]
+    #     center.append((int(round(x)), int(round(y))))
+
+    array_center = np.array(point_det, dtype=float)  # array with the centre of the points detected
+
+    # now that we have detected the centre we are going to increase the precision of the detected point
+    im_centre = Image.fromarray(
+        255 * ArrayDicom[height // 2 - 20:height // 2 + 20, width // 2 - 20:width // 2 + 20])
+    im_centre = im_centre.resize((im_centre.width * 10, im_centre.height * 10), Image.LANCZOS)
+
+    xdet_int, ydet_int = point_detect_singleImage(im_centre)
+    xdet = int(width // 2 - 20) + xdet_int / 10
+    ydet = int(height // 2 - 20) + ydet_int / 10
+
+    center.append((xdet, ydet))
+
+    textstr = ''
+
+    fig=viewer(u.range_invert(ArrayDicom_o), dx, dy, center, title, textstr)
+
+    return fig, center
+
+
+
+
+
+
+
+
+
+
+
 def point_detect_singleImage(imcirclist):
     detCenterXRegion = []
     detCenterYRegion = []
@@ -802,61 +857,7 @@ def point_detect_singleImage(imcirclist):
     detCenterXRegion=xindx
     detCenterYRegion=yindx
 
-
-
-
-
-
     return detCenterXRegion,detCenterYRegion
-
-
-
-
-
-
-
-
-def point_detect_multiple_Images(imcirclist):
-    k = 0
-    detCenterXRegion = []
-    detCenterYRegion = []
-
-    print('Finding bibs in phantom...')
-    for img in tqdm(imcirclist):
-        grey_img = np.array(img, dtype=np.uint8) #converting the image to grayscale
-        blobs_log = blob_log(grey_img, min_sigma=15, max_sigma=50, num_sigma=10, threshold=0.05)
-        # print(blobs_log)
-        # exit(0)
-
-        centerXRegion = []
-        centerYRegion = []
-        centerRRegion = []
-        grey_ampRegion = []
-        for blob in blobs_log:
-            y, x, r = blob
-            center = (int(x), int(y))
-            centerXRegion.append(x)
-            centerYRegion.append(y)
-            centerRRegion.append(r)
-            grey_ampRegion.append(grey_img[int(y), int(x)])
-            radius = int(r)
-            # print('center=', center, 'radius=', radius, 'value=', img[center], grey_img[center])
-
-        xindx = int(centerXRegion[np.argmin(grey_ampRegion)])
-        yindx = int(centerYRegion[np.argmin(grey_ampRegion)])
-        rindx = int(centerRRegion[np.argmin(grey_ampRegion)])
-
-
-        detCenterXRegion.append(xindx)
-        detCenterYRegion.append(yindx)
-
-
-        k = k + 1
-
-
-    return detCenterXRegion,detCenterYRegion
-
-
 
 
 
@@ -878,6 +879,8 @@ def read_dicom(dirname,ioption):
         list_ArrayDicom=[]
         list_gantry_angle=[]
         list_collimator_angle=[]
+        list_figs=[]
+        center_g0c90=0
 
         k=0
         for file in tqdm(sorted(files)):
@@ -892,17 +895,17 @@ def read_dicom(dirname,ioption):
                 list_gantry_angle.append(gantry_angle)
                 list_collimator_angle.append(collimator_angle)
 
+                title = ('Gantry= ' + str(gantry_angle), 'Collimator= ' + str(collimator_angle))
+
                 if k==0:
                     title = ('Gantry= ' + str(gantry_angle), 'Collimator= ' + str(collimator_angle))
                     list_title.append(title)
                     ArrayDicom = dataset.pixel_array
+                    height = np.shape(ArrayDicom)[0]
+                    width = np.shape(ArrayDicom)[1]
                 else:
                     if gantry_angle == 0 and collimator_angle == 90: # on this image we will measure the scaling and center of the central dot.
-                        title=('Gantry= ' + str(gantry_angle), 'Collimator= ' + str(collimator_angle))
-                        ArrayDicom_g0c90_o = dataset.pixel_array
-                        ArrayDicom_g0c90 = u.norm01(dataset.pixel_array)
-                        height=np.shape(ArrayDicom_g0c90)[0]
-                        width=np.shape(ArrayDicom_g0c90)[1]
+
 
                         SID = dataset.RTImageSID
                         dx = 1 / (SID * (1 / dataset.ImagePlanePixelSpacing[0]) / 1000)
@@ -910,62 +913,15 @@ def read_dicom(dirname,ioption):
                         print("pixel spacing row [mm]=", dx)
                         print("pixel spacing col [mm]=", dy)
 
-                        # plt.figure()
-                        # plt.imshow(ArrayDicom)
-                        # plt.show(block=False)
+                        ArrayDicom_g0c90_o = dataset.pixel_array
+                        height = np.shape(ArrayDicom_g0c90_o)[0]
+                        width = np.shape(ArrayDicom_g0c90_o)[1]
 
-                        # # test to make sure image is displayed correctly bibs are high amplitude against dark background
-                        # ctr_pixel = ArrayDicom[np.shape(ArrayDicom)[0] // 2, np.shape(ArrayDicom)[1] // 2]
-                        # corner_pixel = ArrayDicom[0, 0]
-                        #
-                        # if ctr_pixel < corner_pixel:  # we need to invert the image range for both clinacs and tb
-                        #     ArrayDicom = u.range_invert(ArrayDicom)
-
-
-                        # plt.figure()
-                        # plt.imshow(ArrayDicom)
-                        # plt.show(block=False)
-
-                        blobs_log = blob_log(ArrayDicom_g0c90, min_sigma=1, max_sigma=5, num_sigma=20,
-                                             threshold=0.15)  # run on windows, for some stupid reason exclude_border is not recognized in my distro at home
-
-                        centerg0c90 = []
-                        point_det = []
-                        for blob in blobs_log:
-                            y, x, r = blob
-                            point_det.append((x, y, r))
-
-                        point_det = sorted(point_det, key=itemgetter(2), reverse=True) # here we sort by the radius of the dot
-
-                        # we need to find the centre dot as well as the larger dots on the sides of the image
-
-                        # for j in range(0, len(point_det)):
-                        #     x, y, r = point_det[j]
-                        #     center.append((int(round(x)), int(round(y))))
-
-
-                        array_center=np.array(point_det,dtype=float) #array with the centre of the points detected
-
-
-                        # now that we have detected the centre we are going to increase the precision of the detected point
-                        im_centre = Image.fromarray(255*ArrayDicom_g0c90[height//2-20:height//2+20,width//2-20:width//2+20])
-                        im_centre = im_centre.resize((im_centre.width * 10, im_centre.height * 10), Image.LANCZOS)
-
-                        xdet_int, ydet_int = point_detect_singleImage(im_centre)
-                        xdet = int(width//2-20)+xdet_int/10
-                        ydet = int(height//2-20)+ydet_int/10
-
-                        centerg0c90.append((xdet,ydet))
-
-                        textstr=''
-
-                        viewer(u.range_invert(ArrayDicom_g0c90_o), dx, dy, centerg0c90, title, textstr)
-
-                        plt.show()
+                        fig,center_g0c90=full_imageProcess(ArrayDicom_g0c90_o,dx,dy,title)
+                        list_figs.append(fig)
 
 
                     else:
-                        title = ('Gantry= ' + str(gantry_angle) , 'Collimator= ' + str(collimator_angle))
                         list_title.append(title)
                         tmp_array = dataset.pixel_array
                         tmp_array = u.norm01(tmp_array)
@@ -977,7 +933,21 @@ def read_dicom(dirname,ioption):
 # TO DO we don't need to find all the bibs in the g=0 coll=90 image we only need to search around the centre
 
 
-    print(np.shape(ArrayDicom),list_title)
+        # print('figures collected',np.shape(ArrayDicom),list_title[0][0],len(list_title))
+        for i in range(0,len(list_title)):
+            fig,center=full_imageProcess(ArrayDicom[:,:,i], dx, dy, list_title[i])
+            list_figs.append(fig)
+
+            x_g0C90,y_g0C90 = center_g0c90[0]
+            x,y = center[0]
+
+            dist = sqrt( (x_g0C90-x)*(x_g0C90-x)*dx*dx + (y_g0C90-y)*(y_g0C90-y)*dy*dy  )
+            # dist = sqrt( (width//2-x)*(width//2-x)*dx*dx + (height//2-y)*(height//2-y)*dy*dy  )
+            print(list_title[i],'center_g0c90=',center_g0c90,'center=',center,dist)
+
+        plt.show()
+
+
     exit(0)
 
 
