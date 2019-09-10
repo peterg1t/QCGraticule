@@ -880,7 +880,7 @@ def read_dicom(dirname,ioption):
         list_gantry_angle=[]
         list_collimator_angle=[]
         list_figs=[]
-        center_g0c90=0
+        center_g0c90=[(0,0)]
         dx=0
         dy=0
 
@@ -898,6 +898,7 @@ def read_dicom(dirname,ioption):
                 list_collimator_angle.append(collimator_angle)
 
                 title = ('Gantry= ' + str(gantry_angle), 'Collimator= ' + str(collimator_angle))
+                print(title)
 
                 if k==0:
                     title = ('Gantry= ' + str(gantry_angle), 'Collimator= ' + str(collimator_angle))
@@ -905,10 +906,11 @@ def read_dicom(dirname,ioption):
                     ArrayDicom = dataset.pixel_array
                     height = np.shape(ArrayDicom)[0]
                     width = np.shape(ArrayDicom)[1]
+                    SID = dataset.RTImageSID
+                    dx = 1 / (SID * (1 / dataset.ImagePlanePixelSpacing[0]) / 1000)
+                    dy = 1 / (SID * (1 / dataset.ImagePlanePixelSpacing[1]) / 1000)
                 else:
-                    if gantry_angle == 0 and collimator_angle == 90: # on this image we will measure the scaling and center of the central dot.
-
-
+                    if (gantry_angle > 358 or gantry_angle < 1) and (collimator_angle > 88 or collimator_angle < 92): # on this image we will measure the scaling and center of the central dot.
                         SID = dataset.RTImageSID
                         dx = 1 / (SID * (1 / dataset.ImagePlanePixelSpacing[0]) / 1000)
                         dy = 1 / (SID * (1 / dataset.ImagePlanePixelSpacing[1]) / 1000)
@@ -923,6 +925,7 @@ def read_dicom(dirname,ioption):
                         list_figs.append(fig)
 
 
+
                     else:
                         list_title.append(title)
                         tmp_array = dataset.pixel_array
@@ -935,19 +938,19 @@ def read_dicom(dirname,ioption):
 # TO DO we don't need to find all the bibs in the g=0 coll=90 image we only need to search around the centre
 
 
-        # print('figures collected',np.shape(ArrayDicom),list_title[0][0],len(list_title))
-        for i in range(0,len(list_title)):
-            fig,center=full_imageProcess(ArrayDicom[:,:,i], dx, dy, list_title[i])
-            list_figs.append(fig)
+    # print('figures collected',np.shape(ArrayDicom),list_title[0][0],len(list_title))
+    for i in range(0,len(list_title)):
+        fig,center=full_imageProcess(ArrayDicom[:,:,i], dx, dy, list_title[i])
+        list_figs.append(fig)
 
-            x_g0C90,y_g0C90 = center_g0c90[0]
-            x,y = center[0]
+        x_g0C90,y_g0C90 = center_g0c90[0]
+        x,y = center[0]
 
-            dist = sqrt( (x_g0C90-x)*(x_g0C90-x)*dx*dx + (y_g0C90-y)*(y_g0C90-y)*dy*dy  )
-            # dist = sqrt( (width//2-x)*(width//2-x)*dx*dx + (height//2-y)*(height//2-y)*dy*dy  )
-            print(list_title[i],'center_g0c90=',center_g0c90,'center=',center,dist)
+        dist = sqrt( (x_g0C90-x)*(x_g0C90-x)*dx*dx + (y_g0C90-y)*(y_g0C90-y)*dy*dy  )
+        # dist = sqrt( (width//2-x)*(width//2-x)*dx*dx + (height//2-y)*(height//2-y)*dy*dy  )
+        print(list_title[i],'center_g0c90=',center_g0c90,'center=',center,dist)
 
-        plt.show()
+    plt.show()
 
 
     exit(0)
