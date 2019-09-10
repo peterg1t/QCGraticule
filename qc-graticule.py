@@ -881,6 +881,8 @@ def read_dicom(dirname,ioption):
         list_collimator_angle=[]
         list_figs=[]
         center_g0c90=0
+        dx=0
+        dy=0
 
         k=0
         for file in tqdm(sorted(files)):
