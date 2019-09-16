@@ -745,7 +745,7 @@ def viewer(volume, dx, dy,center,title,textstr):
         # ax.scatter(x*dx+dx/2,(volume.shape[0]-y)*dy-dy/2) #adding dx/2 and subtracting dy/2 correctly puts the point in the center of the pixel when using extents and not in the edge.
         ax.scatter(x*dx,(volume.shape[0]-y)*dy) #perfect!
 
-    return fig
+    return fig, ax
 
 
 
@@ -812,9 +812,9 @@ def full_imageProcess(ArrayDicom_o,dx,dy,title):  #process a full image
 
     textstr = ''
 
-    fig=viewer(u.range_invert(ArrayDicom_o), dx, dy, center, title, textstr)
+    fig, ax=viewer(u.range_invert(ArrayDicom_o), dx, dy, center, title, textstr)
 
-    return fig, center
+    return fig, ax, center
 
 
 
@@ -921,7 +921,7 @@ def read_dicom(dirname,ioption):
                         height = np.shape(ArrayDicom_g0c90_o)[0]
                         width = np.shape(ArrayDicom_g0c90_o)[1]
 
-                        fig,center_g0c90=full_imageProcess(ArrayDicom_g0c90_o,dx,dy,title)
+                        fig, ax ,center_g0c90=full_imageProcess(ArrayDicom_g0c90_o,dx,dy,title)
                         list_figs.append(fig)
 
 
@@ -940,13 +940,17 @@ def read_dicom(dirname,ioption):
 
     # print('figures collected',np.shape(ArrayDicom),list_title[0][0],len(list_title))
     for i in range(0,len(list_title)):
-        fig,center=full_imageProcess(ArrayDicom[:,:,i], dx, dy, list_title[i])
+        fig, ax, center=full_imageProcess(ArrayDicom[:,:,i], dx, dy, list_title[i])
         list_figs.append(fig)
 
         x_g0C90,y_g0C90 = center_g0c90[0]
         x,y = center[0]
 
         dist = sqrt( (x_g0C90-x)*(x_g0C90-x)*dx*dx + (y_g0C90-y)*(y_g0C90-y)*dy*dy  )
+
+        textstr=str(dist)+' mm'
+
+        ax.text((ArrayDicom.shape[1] + 250) * dx, (ArrayDicom.shape[0]) * dy, textstr)
         # dist = sqrt( (width//2-x)*(width//2-x)*dx*dx + (height//2-y)*(height//2-y)*dy*dy  )
         print(list_title[i],'center_g0c90=',center_g0c90,'center=',center,dist)
 
