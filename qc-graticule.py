@@ -772,6 +772,46 @@ def shape_detect(c):
 
 
 
+def scalingAnalysis(ArrayDicom_o,dx,dy,title):  #determine scaling
+    ArrayDicom = u.norm01(ArrayDicom_o)
+    height = np.shape(ArrayDicom)[0]
+    width = np.shape(ArrayDicom)[1]
+
+    blobs_log = blob_log(ArrayDicom, min_sigma=1, max_sigma=5, num_sigma=20,
+                         threshold=0.15)  # run on windows, for some stupid reason exclude_border is not recognized in my distro at home
+
+    center = []
+    point_det = []
+    for blob in blobs_log:
+        y, x, r = blob
+        point_det.append((x, y, r))
+
+    point_det = sorted(point_det, key=itemgetter(2),
+                       reverse=True)  # here we sort by the radius of the dot bigger dots are around the center and edges
+
+
+    print(point_det[:6])  # print the first six points, all the points and only the first component
+    print(np.asarray(point_det)[:6,0])  # print the first six points, all the points and only the first component
+    point_det=np.asarray(point_det)
+
+    #now we need to select the most extreme left and right point
+    print(np.shape(ArrayDicom)[0]//2)
+    print(abs(point_det[:6,1]-np.shape(ArrayDicom)[0]//2)<10)
+    point_sel=[]
+    for i in range(0,6):
+        if abs(point_det[i, 1] - np.shape(ArrayDicom)[0] // 2) < 10:
+            point_sel.append(abs(point_det[i, :]))
+
+    point_sel=np.asarray(point_sel)
+    imax = np.argmax(point_sel[:,0])
+    imin = np.argmin(point_sel[:,0])
+
+    print(point_sel[imax,:],point_sel[imin,:])
+    distance = np.sqrt((point_sel[imax,0]-point_sel[imin,0])*(point_sel[imax,0]-point_sel[imin,0])*dx*dx + (point_sel[imax,1]-point_sel[imin,1])*(point_sel[imax,1]-point_sel[imin,1])*dy*dy)/10.
+    print('distance=',distance,'cm') #distance is reported in cm
+
+
+    return distance
 
 
 
@@ -789,7 +829,7 @@ def full_imageProcess(ArrayDicom_o,dx,dy,title):  #process a full image
         y, x, r = blob
         point_det.append((x, y, r))
 
-    point_det = sorted(point_det, key=itemgetter(2), reverse=True)  # here we sort by the radius of the dot
+    point_det = sorted(point_det, key=itemgetter(2), reverse=True)  # here we sort by the radius of the dot bigger dots are around the center and edges
 
     # we need to find the centre dot as well as the larger dots on the sides of the image
 
@@ -812,9 +852,54 @@ def full_imageProcess(ArrayDicom_o,dx,dy,title):  #process a full image
 
     textstr = ''
 
+    print('center=',center)
     fig, ax=viewer(u.range_invert(ArrayDicom_o), dx, dy, center, title, textstr)
 
     return fig, ax, center
+
+
+
+
+def full_imageProcess_noGraph(ArrayDicom_o,dx,dy,title):  #process a full image
+    ArrayDicom = u.norm01(ArrayDicom_o)
+    height = np.shape(ArrayDicom)[0]
+    width = np.shape(ArrayDicom)[1]
+
+    blobs_log = blob_log(ArrayDicom, min_sigma=1, max_sigma=5, num_sigma=20,
+                         threshold=0.15)  # run on windows, for some stupid reason exclude_border is not recognized in my distro at home
+
+    center = []
+    point_det = []
+    for blob in blobs_log:
+        y, x, r = blob
+        point_det.append((x, y, r))
+
+    point_det = sorted(point_det, key=itemgetter(2), reverse=True)  # here we sort by the radius of the dot bigger dots are around the center and edges
+
+    # we need to find the centre dot as well as the larger dots on the sides of the image
+
+    # for j in range(0, len(point_det)):
+    #     x, y, r = point_det[j]
+    #     center.append((int(round(x)), int(round(y))))
+
+    array_center = np.array(point_det, dtype=float)  # array with the centre of the points detected
+
+    # now that we have detected the centre we are going to increase the precision of the detected point
+    im_centre = Image.fromarray(
+        255 * ArrayDicom[height // 2 - 20:height // 2 + 20, width // 2 - 20:width // 2 + 20])
+    im_centre = im_centre.resize((im_centre.width * 10, im_centre.height * 10), Image.LANCZOS)
+
+    xdet_int, ydet_int = point_detect_singleImage(im_centre)
+    xdet = int(width // 2 - 20) + xdet_int / 10
+    ydet = int(height // 2 - 20) + ydet_int / 10
+
+    center.append((xdet, ydet))
+
+    textstr = ''
+
+    # fig, ax=viewer(u.range_invert(ArrayDicom_o), dx, dy, center, title, textstr)
+
+    return center
 
 
 
@@ -921,8 +1006,12 @@ def read_dicom(dirname,ioption):
                         height = np.shape(ArrayDicom_g0c90_o)[0]
                         width = np.shape(ArrayDicom_g0c90_o)[1]
 
-                        fig, ax ,center_g0c90=full_imageProcess(ArrayDicom_g0c90_o,dx,dy,title)
-                        list_figs.append(fig)
+                        fig_g0c90, ax_g0c90 ,center_g0c90=full_imageProcess(ArrayDicom_g0c90_o,dx,dy,title)
+                        distance=scalingAnalysis(ArrayDicom_g0c90_o,dx,dy,title)
+                        textstr = 'dist=' + str(distance) + 'cm'
+                        ax_g0c90.text((ArrayDicom.shape[1] + 250) * dx, (ArrayDicom.shape[0]) * dy, textstr)
+
+                        list_figs.append(fig_g0c90)
 
 
 
@@ -940,18 +1029,18 @@ def read_dicom(dirname,ioption):
 
     # print('figures collected',np.shape(ArrayDicom),list_title[0][0],len(list_title))
     for i in range(0,len(list_title)):
-        fig, ax, center=full_imageProcess(ArrayDicom[:,:,i], dx, dy, list_title[i])
-        list_figs.append(fig)
+        center=full_imageProcess_noGraph(ArrayDicom[:,:,i], dx, dy, list_title[i])
 
         x_g0C90,y_g0C90 = center_g0c90[0]
         x,y = center[0]
+        ax_g0c90.scatter(x * dx, (ArrayDicom[:,:,i].shape[0] - y) * dy)  # perfect!
 
         dist = sqrt( (x_g0C90-x)*(x_g0C90-x)*dx*dx + (y_g0C90-y)*(y_g0C90-y)*dy*dy  )
 
-        textstr=str(dist)+' mm'
+        textstr='offset='+str(dist)+' mm'
 
-        ax.text((ArrayDicom.shape[1] + 250) * dx, (ArrayDicom.shape[0]) * dy, textstr)
-        # dist = sqrt( (width//2-x)*(width//2-x)*dx*dx + (height//2-y)*(height//2-y)*dy*dy  )
+        ax_g0c90.text((ArrayDicom.shape[1] + 250) * dx, (ArrayDicom.shape[0]-(i+1)*50) * dy, textstr)
+        dist = sqrt( (width//2-x)*(width//2-x)*dx*dx + (height//2-y)*(height//2-y)*dy*dy  )
         print(list_title[i],'center_g0c90=',center_g0c90,'center=',center,dist)
 
     plt.show()
