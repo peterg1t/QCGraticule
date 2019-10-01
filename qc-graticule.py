@@ -718,9 +718,11 @@ def running_mean(x, N):
 # axial visualization and scrolling
 def viewer(volume, dx, dy,center,title,textstr):
     # remove_keymap_conflicts({'j', 'k'})
-    fig = plt.figure(figsize=(8,5))
+    fig = plt.figure(figsize=(12,7))
     ax = fig.subplots()
     ax.volume = volume
+    width=volume.shape[1]
+    height=volume.shape[0]
     extent = (0, 0 + (volume.shape[1] * dx),
               0, 0 + (volume.shape[0] * dy))
     img=ax.imshow(volume, extent=extent)
@@ -729,6 +731,8 @@ def viewer(volume, dx, dy,center,title,textstr):
     ax.set_ylabel('y distance [mm]')
     # ax.set_xlabel('x pixel')
     # ax.set_ylabel('y pixel')
+    ax.set_xlim(width*dx/2-10, width*dx/2+10)
+    ax.set_ylim(height*dy/2-10, height*dy/2+10)
 
     # fig.suptitle('Image', fontsize=16)
     print(title[0])
@@ -743,7 +747,7 @@ def viewer(volume, dx, dy,center,title,textstr):
     for x,y in center:
         # ax.scatter(x,y)
         # ax.scatter(x*dx+dx/2,(volume.shape[0]-y)*dy-dy/2) #adding dx/2 and subtracting dy/2 correctly puts the point in the center of the pixel when using extents and not in the edge.
-        ax.scatter(x*dx,(volume.shape[0]-y)*dy) #perfect!
+        ax.scatter(x*dx,(volume.shape[0]-y)*dy,label=title,color='k') #perfect!
 
     return fig, ax
 
@@ -982,11 +986,13 @@ def read_dicom(dirname,ioption):
                 list_gantry_angle.append(gantry_angle)
                 list_collimator_angle.append(collimator_angle)
 
-                title = ('Gantry= ' + str(gantry_angle), 'Collimator= ' + str(collimator_angle))
+                # title = ('Gantry= ' + str(gantry_angle), 'Collimator= ' + str(collimator_angle))
+                title = ('g' + str(gantry_angle),'c' + str(collimator_angle))
                 print(title)
 
                 if k==0:
-                    title = ('Gantry= ' + str(gantry_angle), 'Collimator= ' + str(collimator_angle))
+                    # title = ('Gantry= ' + str(gantry_angle), 'Collimator= ' + str(collimator_angle))
+                    title = ('g' + str(gantry_angle),'c' + str(collimator_angle))
                     list_title.append(title)
                     ArrayDicom = dataset.pixel_array
                     height = np.shape(ArrayDicom)[0]
@@ -1033,17 +1039,30 @@ def read_dicom(dirname,ioption):
 
         x_g0C90,y_g0C90 = center_g0c90[0]
         x,y = center[0]
-        ax_g0c90.scatter(x * dx, (ArrayDicom[:,:,i].shape[0] - y) * dy)  # perfect!
 
-        dist = sqrt( (x_g0C90-x)*(x_g0C90-x)*dx*dx + (y_g0C90-y)*(y_g0C90-y)*dy*dy  )
+        dist = sqrt((x_g0C90 - x) * (x_g0C90 - x) * dx * dx + (y_g0C90 - y) * (y_g0C90 - y) * dy * dy)
 
-        textstr='offset='+str(dist)+' mm'
+        textstr = 'offset' + str(list_title[i]) + '=' + str(round(dist, 4)) + ' mm'
 
-        ax_g0c90.text((ArrayDicom.shape[1] + 250) * dx, (ArrayDicom.shape[0]-(i+1)*50) * dy, textstr)
-        dist = sqrt( (width//2-x)*(width//2-x)*dx*dx + (height//2-y)*(height//2-y)*dy*dy  )
+        ax_g0c90.scatter(x * dx, (ArrayDicom[:,:,i].shape[0] - y) * dy, label=textstr)  # perfect!
+
+
+
+
+
+        # ax_g0c90.text((ArrayDicom.shape[1] + 10) * dx, (ArrayDicom.shape[0]-(i+1)*5) * dy, textstr)
+        # dist = sqrt( (width//2-x)*(width//2-x)*dx*dx + (height//2-y)*(height//2-y)*dy*dy  ) #distance from the center of the image
         print(list_title[i],'center_g0c90=',center_g0c90,'center=',center,dist)
+        ax_g0c90.legend(bbox_to_anchor=(1.25, 1), loc=2, borderaxespad=0.)
 
-    plt.show()
+
+    with PdfPages(dirname + '/' + 'Graticule_report.pdf') as pdf:
+    # with PdfPages('Epid_report.pdf') as pdf:
+        pdf.savefig(fig_g0c90)
+
+
+
+    # plt.show()
 
 
     exit(0)
