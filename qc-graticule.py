@@ -747,7 +747,9 @@ def viewer(volume, dx, dy,center,title,textstr):
     for x,y in center:
         # ax.scatter(x,y)
         # ax.scatter(x*dx+dx/2,(volume.shape[0]-y)*dy-dy/2) #adding dx/2 and subtracting dy/2 correctly puts the point in the center of the pixel when using extents and not in the edge.
-        ax.scatter(x*dx,(volume.shape[0]-y)*dy,label=title,color='k') #perfect!
+        ax.scatter(x*dx,(volume.shape[0]-y)*dy,label=title,color='k'
+
+                   ) #perfect!
 
     return fig, ax
 
