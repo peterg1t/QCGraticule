@@ -666,9 +666,9 @@
 
 ###########################################################################################
 #
-#   Script name: qc-epidmtf
+#   Script name: qc-graticule
 #
-#   Description: Tool for calculating epid modlation transfer function (MTF) using a QCMV phantom (Standard Imaging).
+#   Description: Tool for calculating graticule centre at different gantry angles.
 #
 #   Example usage: python qc-epidmtf "/file/"
 #
@@ -972,10 +972,11 @@ def read_dicom(dirname,ioption):
         list_collimator_angle=[]
         list_figs=[]
         center_g0c90=[(0,0)]
+        center_g0=[(0,0)]
         dx=0
         dy=0
 
-        k=0
+        k=0 # we callect all the images in ArrayDicom
         for file in tqdm(sorted(files)):
             print(file)
 
@@ -1002,70 +1003,56 @@ def read_dicom(dirname,ioption):
                     SID = dataset.RTImageSID
                     dx = 1 / (SID * (1 / dataset.ImagePlanePixelSpacing[0]) / 1000)
                     dy = 1 / (SID * (1 / dataset.ImagePlanePixelSpacing[1]) / 1000)
+                    print("pixel spacing row [mm]=", dx)
+                    print("pixel spacing col [mm]=", dy)
+
                 else:
-                    if (gantry_angle > 358 or gantry_angle < 1) and (collimator_angle > 88 or collimator_angle < 92): # on this image we will measure the scaling and center of the central dot.
-                        SID = dataset.RTImageSID
-                        dx = 1 / (SID * (1 / dataset.ImagePlanePixelSpacing[0]) / 1000)
-                        dy = 1 / (SID * (1 / dataset.ImagePlanePixelSpacing[1]) / 1000)
-                        print("pixel spacing row [mm]=", dx)
-                        print("pixel spacing col [mm]=", dy)
-
-                        ArrayDicom_g0c90_o = dataset.pixel_array
-                        height = np.shape(ArrayDicom_g0c90_o)[0]
-                        width = np.shape(ArrayDicom_g0c90_o)[1]
-
-                        fig_g0c90, ax_g0c90 ,center_g0c90=full_imageProcess(ArrayDicom_g0c90_o,dx,dy,title)
-                        distance=scalingAnalysis(ArrayDicom_g0c90_o,dx,dy,title)
-                        textstr = 'dist=' + str(distance) + 'cm'
-                        ax_g0c90.text((ArrayDicom.shape[1] + 250) * dx, (ArrayDicom.shape[0]) * dy, textstr)
-
-                        list_figs.append(fig_g0c90)
-
-
-
-                    else:
-                        list_title.append(title)
-                        tmp_array = dataset.pixel_array
-                        tmp_array = u.norm01(tmp_array)
-                        ArrayDicom = np.dstack((ArrayDicom, tmp_array))
+                    list_title.append(title)
+                    tmp_array = dataset.pixel_array
+                    tmp_array = u.norm01(tmp_array)
+                    ArrayDicom = np.dstack((ArrayDicom, tmp_array))
 
             k=k+1
 
 
-# TO DO we don't need to find all the bibs in the g=0 coll=90 image we only need to search around the centre
-
-
-    # print('figures collected',np.shape(ArrayDicom),list_title[0][0],len(list_title))
+    # After we colect all the images we only select g0c90 and g0c270 to calculate the center at g0
     for i in range(0,len(list_title)):
-        center=full_imageProcess_noGraph(ArrayDicom[:,:,i], dx, dy, list_title[i])
+        if list_title[i][0]=='g0' and list_title[i][1]=='c90':
+            height = np.shape(ArrayDicom[:, :, i])[0]
+            width = np.shape(ArrayDicom[:, :, i])[1]
+            fig_g0c90, ax_g0c90, center_g0c90 = full_imageProcess(ArrayDicom[:, :, i], dx, dy, list_title[i])
+            center_g0[0]= (center_g0[0][0] + center_g0c90[0][0]*.5,center_g0[0][1] + center_g0c90[0][1]*.5)
 
-        x_g0C90,y_g0C90 = center_g0c90[0]
-        x,y = center[0]
+            list_figs.append(fig_g0c90)  # we plot always the image at g0c90
 
-        dist = sqrt((x_g0C90 - x) * (x_g0C90 - x) * dx * dx + (y_g0C90 - y) * (y_g0C90 - y) * dy * dy)
-
-        textstr = 'offset' + str(list_title[i]) + '=' + str(round(dist, 4)) + ' mm'
-
-        ax_g0c90.scatter(x * dx, (ArrayDicom[:,:,i].shape[0] - y) * dy, label=textstr)  # perfect!
-
-
-
+        if list_title[i][0]=='g0' and list_title[i][1]=='c270':
+            center_g0c270 = full_imageProcess_noGraph(ArrayDicom[:, :, i], dx, dy, list_title[i])
+            center_g0[0]= (center_g0[0][0] + center_g0c270[0][0]*.5,center_g0[0][1] + center_g0c270[0][1]*.5)
 
 
-        # ax_g0c90.text((ArrayDicom.shape[1] + 10) * dx, (ArrayDicom.shape[0]-(i+1)*5) * dy, textstr)
-        # dist = sqrt( (width//2-x)*(width//2-x)*dx*dx + (height//2-y)*(height//2-y)*dy*dy  ) #distance from the center of the image
-        print(list_title[i],'center_g0c90=',center_g0c90,'center=',center,dist)
-        ax_g0c90.legend(bbox_to_anchor=(1.25, 1), loc=2, borderaxespad=0.)
+
+
+
+    for i in range(0,len(list_title)):
+        if list_title[i][1] != 'c90':
+            center=full_imageProcess_noGraph(ArrayDicom[:,:,i], dx, dy, list_title[i])
+
+            x_g0,y_g0 = center_g0[0]
+            x,y = center[0]
+
+            dist = sqrt((x_g0 - x) * (x_g0 - x) * dx * dx + (y_g0 - y) * (y_g0 - y) * dy * dy)
+            # dist = sqrt((width//2 - x) * (width//2 - x) * dx * dx + (height//2 - y) * (height//2 - y) * dy * dy)
+
+            textstr = 'offset' + str(list_title[i]) + '=' + str(round(dist, 4)) + ' mm'
+
+            ax_g0c90.scatter(x * dx, (ArrayDicom[:,:,i].shape[0] - y) * dy, label=textstr)  # perfect!
+
+            print(list_title[i],'center_g0c90=',center_g0c90,'center=',center,dist)
+            ax_g0c90.legend(bbox_to_anchor=(1.25, 1), loc=2, borderaxespad=0.)
 
 
     with PdfPages(dirname + '/' + 'Graticule_report.pdf') as pdf:
-    # with PdfPages('Epid_report.pdf') as pdf:
         pdf.savefig(fig_g0c90)
-
-
-
-    # plt.show()
-
 
     exit(0)
 
