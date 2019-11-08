@@ -51,20 +51,16 @@
 
 import os
 import sys
-
-# sys.path.append('C:\Program Files\GDCM 2.8\lib')
+import argparse
 import pydicom
-import subprocess
+from operator import itemgetter
+from math import sqrt
 import matplotlib.pyplot as plt
-from matplotlib.patches import Polygon
+# from matplotlib.patches import Polygon
 from matplotlib.backends.backend_pdf import PdfPages
 from tqdm import tqdm
 import numpy as np
-import argparse
-import cv2
 from skimage.feature import blob_log
-from math import *
-from operator import itemgetter
 import utils as u
 from PIL import Image
 
@@ -86,16 +82,16 @@ def running_mean(x, N):
 
 
 # axial visualization and scrolling
-def viewer(volume, dx, dy,center,title,textstr):
+def viewer(volume, dx, dy, center, title, textstr):
     # remove_keymap_conflicts({'j', 'k'})
-    fig = plt.figure(figsize=(12,7))
+    fig = plt.figure(figsize=(12, 7))
     ax = fig.subplots()
     ax.volume = volume
-    width=volume.shape[1]
-    height=volume.shape[0]
+    width = volume.shape[1]
+    height = volume.shape[0]
     extent = (0, 0 + (volume.shape[1] * dx),
               0, 0 + (volume.shape[0] * dy))
-    img=ax.imshow(volume, extent=extent)
+    img = ax.imshow(volume, extent=extent)
     # img=ax.imshow(volume)
     ax.set_xlabel('x distance [mm]')
     ax.set_ylabel('y distance [mm]')
@@ -110,14 +106,14 @@ def viewer(volume, dx, dy,center,title,textstr):
 
     # for i in range(0,len(poly)): #maybe at a later stage we will add polygons drawings
     #     ax.add_patch(poly[i])
-    ax.text((volume.shape[1]+250)*dx,(volume.shape[0])*dy,textstr)
+    ax.text((volume.shape[1]+250)*dx, (volume.shape[0])*dy, textstr)
     fig.subplots_adjust(right=0.75)
     fig.colorbar(img, ax=ax, orientation='vertical')
     # fig.canvas.mpl_connect('key_press_event', process_key_axial)
-    for x,y in center:
+    for x, y in center:
         # ax.scatter(x,y)
         # ax.scatter(x*dx+dx/2,(volume.shape[0]-y)*dy-dy/2) #adding dx/2 and subtracting dy/2 correctly puts the point in the center of the pixel when using extents and not in the edge.
-        ax.scatter(x*dx,(volume.shape[0]-y)*dy,label=title,color='k'
+        ax.scatter(x*dx, (volume.shape[0]-y)*dy, label=title, color='k'
 
                    ) #perfect!
 
@@ -129,34 +125,30 @@ def viewer(volume, dx, dy,center,title,textstr):
 
 
 
-def shape_detect(c):
-    shape='unidentified'
-    peri=cv2.arcLength(c,True)
-    approx=cv2.approxPolyDP(c) #number of vertices in the contour
-    if len(approx)==3:
-        shape='triangle'
-    elif len(approx)==4:
-        #compute the bounding box of the contour and find the aspect ratio
-        (x,y,w,h)=cv2.boundingRect(approx)
-        ar=w/float(h)
+# def shape_detect(c):
+#     shape = 'unidentified'
+#     peri = cv2.arcLength(c,True)
+#     approx = cv2.approxPolyDP(c) #number of vertices in the contour
+#     if len(approx) == 3:
+#         shape = 'triangle'
+#     elif len(approx) == 4:
+#         #compute the bounding box of the contour and find the aspect ratio
+#         (x, y, w, h) = cv2.boundingRect(approx)
+#         ar = w/float(h)
+#
+#         shape = 'square' if ar >= 0.95 and ar <= 1.05 else 'rectangle'
+#     else:
+#         shape = 'circle'
+#
+#     return shape
 
-        shape='square' if ar >=0.95 and ar <=1.05 else 'rectangle'
-    else:
-        shape='circle'
-
-    return shape
 
 
-
-def scalingAnalysis(ArrayDicom_o,dx,dy,title):  #determine scaling
+def scalingAnalysis(ArrayDicom_o, dx, dy):  #determine scaling
     ArrayDicom = u.norm01(ArrayDicom_o)
-    height = np.shape(ArrayDicom)[0]
-    width = np.shape(ArrayDicom)[1]
-
     blobs_log = blob_log(ArrayDicom, min_sigma=1, max_sigma=5, num_sigma=20,
                          threshold=0.15)  # run on windows, for some stupid reason exclude_border is not recognized in my distro at home
 
-    center = []
     point_det = []
     for blob in blobs_log:
         y, x, r = blob
@@ -167,31 +159,31 @@ def scalingAnalysis(ArrayDicom_o,dx,dy,title):  #determine scaling
 
 
     print(point_det[:6])  # print the first six points, all the points and only the first component
-    print(np.asarray(point_det)[:6,0])  # print the first six points, all the points and only the first component
-    point_det=np.asarray(point_det)
+    print(np.asarray(point_det)[:6, 0])  # print the first six points, all the points and only the first component
+    point_det = np.asarray(point_det)
 
     #now we need to select the most extreme left and right point
     print(np.shape(ArrayDicom)[0]//2)
-    print(abs(point_det[:6,1]-np.shape(ArrayDicom)[0]//2)<10)
-    point_sel=[]
-    for i in range(0,6):
+    print(abs(point_det[:6, 1]-np.shape(ArrayDicom)[0]//2) < 10)
+    point_sel = []
+    for i in range(0, 6):
         if abs(point_det[i, 1] - np.shape(ArrayDicom)[0] // 2) < 10:
             point_sel.append(abs(point_det[i, :]))
 
-    point_sel=np.asarray(point_sel)
-    imax = np.argmax(point_sel[:,0])
-    imin = np.argmin(point_sel[:,0])
+    point_sel = np.asarray(point_sel)
+    imax = np.argmax(point_sel[:, 0])
+    imin = np.argmin(point_sel[:, 0])
 
-    print(point_sel[imax,:],point_sel[imin,:])
-    distance = np.sqrt((point_sel[imax,0]-point_sel[imin,0])*(point_sel[imax,0]-point_sel[imin,0])*dx*dx + (point_sel[imax,1]-point_sel[imin,1])*(point_sel[imax,1]-point_sel[imin,1])*dy*dy)/10.
-    print('distance=',distance,'cm') #distance is reported in cm
+    print(point_sel[imax, :], point_sel[imin, :])
+    distance = np.sqrt((point_sel[imax, 0]-point_sel[imin, 0])*(point_sel[imax, 0]-point_sel[imin, 0])*dx*dx + (point_sel[imax, 1]-point_sel[imin, 1])*(point_sel[imax, 1]-point_sel[imin, 1])*dy*dy)/10.
+    print('distance=', distance, 'cm') #distance is reported in cm
 
 
     return distance
 
 
 
-def full_imageProcess(ArrayDicom_o,dx,dy,title):  #process a full image
+def full_imageProcess(ArrayDicom_o, dx, dy, title):  #process a full image
     ArrayDicom = u.norm01(ArrayDicom_o)
     height = np.shape(ArrayDicom)[0]
     width = np.shape(ArrayDicom)[1]
@@ -213,7 +205,7 @@ def full_imageProcess(ArrayDicom_o,dx,dy,title):  #process a full image
     #     x, y, r = point_det[j]
     #     center.append((int(round(x)), int(round(y))))
 
-    array_center = np.array(point_det, dtype=float)  # array with the centre of the points detected
+
 
     # now that we have detected the centre we are going to increase the precision of the detected point
     im_centre = Image.fromarray(
@@ -228,15 +220,15 @@ def full_imageProcess(ArrayDicom_o,dx,dy,title):  #process a full image
 
     textstr = ''
 
-    print('center=',center)
-    fig, ax=viewer(u.range_invert(ArrayDicom_o), dx, dy, center, title, textstr)
+    print('center=', center)
+    fig, ax = viewer(u.range_invert(ArrayDicom_o), dx, dy, center, title, textstr)
 
     return fig, ax, center
 
 
 
 
-def full_imageProcess_noGraph(ArrayDicom_o,dx,dy,title):  #process a full image
+def full_imageProcess_noGraph(ArrayDicom_o):  #process a full image
     ArrayDicom = u.norm01(ArrayDicom_o)
     height = np.shape(ArrayDicom)[0]
     width = np.shape(ArrayDicom)[1]
@@ -258,7 +250,7 @@ def full_imageProcess_noGraph(ArrayDicom_o,dx,dy,title):  #process a full image
     #     x, y, r = point_det[j]
     #     center.append((int(round(x)), int(round(y))))
 
-    array_center = np.array(point_det, dtype=float)  # array with the centre of the points detected
+
 
     # now that we have detected the centre we are going to increase the precision of the detected point
     im_centre = Image.fromarray(
@@ -271,7 +263,7 @@ def full_imageProcess_noGraph(ArrayDicom_o,dx,dy,title):  #process a full image
 
     center.append((xdet, ydet))
 
-    textstr = ''
+
 
     # fig, ax=viewer(u.range_invert(ArrayDicom_o), dx, dy, center, title, textstr)
 
@@ -303,22 +295,22 @@ def point_detect_singleImage(imcirclist):
     grey_ampRegion = []
     for blob in blobs_log:
         y, x, r = blob
-        center = (int(x), int(y))
+        # center = (int(x), int(y))
         centerXRegion.append(x)
         centerYRegion.append(y)
         centerRRegion.append(r)
         grey_ampRegion.append(grey_img[int(y), int(x)])
-        radius = int(r)
+        # radius = int(r)
         # print('center=', center, 'radius=', radius, 'value=', img[center], grey_img[center])
 
     xindx = int(centerXRegion[np.argmin(grey_ampRegion)])
     yindx = int(centerYRegion[np.argmin(grey_ampRegion)])
-    rindx = int(centerRRegion[np.argmin(grey_ampRegion)])
+    # rindx = int(centerRRegion[np.argmin(grey_ampRegion)])
 
-    detCenterXRegion=xindx
-    detCenterYRegion=yindx
+    detCenterXRegion = xindx
+    detCenterYRegion = yindx
 
-    return detCenterXRegion,detCenterYRegion
+    return detCenterXRegion, detCenterYRegion
 
 
 
@@ -334,42 +326,40 @@ def point_detect_singleImage(imcirclist):
 
 
 # def read_dicom(filename1,filename2,ioption):
-def read_dicom(dirname,ioption):
-    for subdir, dirs, files in os.walk(dirname):
+def read_dicom(directory):
+    for subdir, dirs, files in os.walk(directory):# pylint: disable = unused-variable
         list_title = []
-        list_ArrayDicom=[]
-        list_gantry_angle=[]
-        list_collimator_angle=[]
-        list_figs=[]
-        center_g0c90=[(0,0)]
-        center_g0=[(0,0)]
-        dx=0
-        dy=0
+        list_gantry_angle = []
+        list_collimator_angle = []
+        list_figs = []
+        center_g0c90 = [(0, 0)]
+        center_g0 = [(0, 0)]
+        dx = 0
+        dy = 0
 
-        k=0 # we callect all the images in ArrayDicom
+        k = 0 # we callect all the images in ArrayDicom
         for file in tqdm(sorted(files)):
             print(file)
 
-            if os.path.splitext(dirname + file)[1] == '.dcm':
-                dataset = pydicom.dcmread(dirname + file)
-                station_name=dataset[0x3002,0x0020].value
-                gantry_angle=dataset[0x300a,0x011e].value
-                collimator_angle=dataset[0x300a,0x0120].value
+            if os.path.splitext(directory + file)[1] == '.dcm':
+                dataset = pydicom.dcmread(directory + file)
+                gantry_angle = dataset[0x300a, 0x011e].value
+                collimator_angle = dataset[0x300a, 0x0120].value
 
                 list_gantry_angle.append(gantry_angle)
                 list_collimator_angle.append(collimator_angle)
 
                 # title = ('Gantry= ' + str(gantry_angle), 'Collimator= ' + str(collimator_angle))
-                title = ('g' + str(gantry_angle),'c' + str(collimator_angle))
+                title = ('g' + str(gantry_angle), 'c' + str(collimator_angle))
                 print(title)
 
-                if k==0:
+                if k == 0:
                     # title = ('Gantry= ' + str(gantry_angle), 'Collimator= ' + str(collimator_angle))
-                    title = ('g' + str(gantry_angle),'c' + str(collimator_angle))
+                    title = ('g' + str(gantry_angle), 'c' + str(collimator_angle))
                     list_title.append(title)
                     ArrayDicom = dataset.pixel_array
-                    height = np.shape(ArrayDicom)[0]
-                    width = np.shape(ArrayDicom)[1]
+                    # height = np.shape(ArrayDicom)[0]
+                    # width = np.shape(ArrayDicom)[1]
                     SID = dataset.RTImageSID
                     dx = 1 / (SID * (1 / dataset.ImagePlanePixelSpacing[0]) / 1000)
                     dy = 1 / (SID * (1 / dataset.ImagePlanePixelSpacing[1]) / 1000)
@@ -382,50 +372,53 @@ def read_dicom(dirname,ioption):
                     tmp_array = u.norm01(tmp_array)
                     ArrayDicom = np.dstack((ArrayDicom, tmp_array))
 
-            k=k+1
+            k = k+1
 
 
     # After we colect all the images we only select g0c90 and g0c270 to calculate the center at g0
-    for i in range(0,len(list_title)):
-        if list_title[i][0]=='g0' and list_title[i][1]=='c90':
-            height = np.shape(ArrayDicom[:, :, i])[0]
-            width = np.shape(ArrayDicom[:, :, i])[1]
+    # for i in range(0, len(list_title)):
+    for i, _ in enumerate(list_title):
+        if list_title[i][0] == 'g0' and list_title[i][1] == 'c90':
+            # height = np.shape(ArrayDicom[:, :, i])[0]
+            # width = np.shape(ArrayDicom[:, :, i])[1]
             fig_g0c90, ax_g0c90, center_g0c90 = full_imageProcess(ArrayDicom[:, :, i], dx, dy, list_title[i])
-            center_g0[0]= (center_g0[0][0] + center_g0c90[0][0]*.5,center_g0[0][1] + center_g0c90[0][1]*.5)
+            center_g0[0] = (center_g0[0][0] + center_g0c90[0][0]*.5, center_g0[0][1] + center_g0c90[0][1]*.5)
 
             list_figs.append(fig_g0c90)  # we plot always the image at g0c90
 
-        if list_title[i][0]=='g0' and list_title[i][1]=='c270':
-            center_g0c270 = full_imageProcess_noGraph(ArrayDicom[:, :, i], dx, dy, list_title[i])
-            center_g0[0]= (center_g0[0][0] + center_g0c270[0][0]*.5,center_g0[0][1] + center_g0c270[0][1]*.5)
+        if list_title[i][0] == 'g0' and list_title[i][1] == 'c270':
+            center_g0c270 = full_imageProcess_noGraph(ArrayDicom[:, :, i])
+            center_g0[0] = (center_g0[0][0] + center_g0c270[0][0]*.5, center_g0[0][1] + center_g0c270[0][1]*.5)
 
 
 
 
 
-    for i in range(0,len(list_title)):
+    # for i in range(0, len(list_title)):
+    for i, _ in enumerate(list_title):
         if list_title[i][1] != 'c90':
-            center=full_imageProcess_noGraph(ArrayDicom[:,:,i], dx, dy, list_title[i])
+            center = full_imageProcess_noGraph(ArrayDicom[:, :, i])
 
-            x_g0,y_g0 = center_g0[0]
-            x,y = center[0]
+            x_g0, y_g0 = center_g0[0]
+            x, y = center[0]
 
             dist = sqrt((x_g0 - x) * (x_g0 - x) * dx * dx + (y_g0 - y) * (y_g0 - y) * dy * dy)
             # dist = sqrt((width//2 - x) * (width//2 - x) * dx * dx + (height//2 - y) * (height//2 - y) * dy * dy)
 
             textstr = 'offset' + str(list_title[i]) + '=' + str(round(dist, 4)) + ' mm'
 
-            ax_g0c90.scatter(x * dx, (ArrayDicom[:,:,i].shape[0] - y) * dy, label=textstr)  # perfect!
+            ax_g0c90.scatter(x * dx, (ArrayDicom[:, :, i].shape[0] - y) * dy, label=textstr)  # perfect!
 
-            print(list_title[i],'center_g0c90=',center_g0c90,'center=',center,dist)
+            print(list_title[i], 'center_g0c90=', center_g0c90, 'center=', center, dist)
             ax_g0c90.legend(bbox_to_anchor=(1.25, 1), loc=2, borderaxespad=0.)
 
 
-    with PdfPages(dirname + '/' + 'Graticule_report.pdf') as pdf:
+    with PdfPages(directory + '/' + 'Graticule_report.pdf') as pdf:
         pdf.savefig(fig_g0c90)
 
-    exit(0)
 
+    # exit(0)
+    sys.exit(0)
 
 
 
@@ -458,14 +451,15 @@ def read_dicom(dirname,ioption):
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('direpid',type=str,help="Input the directory name")
+parser.add_argument('direpid', type=str, help="Input the directory name")
 
 # parser.add_argument('epid1',type=str,help="Input the filename")
 # parser.add_argument('epid2',type=str,help="Input the filename")
 # parser.add_argument('-a', '--add', nargs='?', type=argparse.FileType('r'), help='additional file for averaging before processing')
-args=parser.parse_args()
+args = parser.parse_args()
 
-dirname=args.direpid
+dirname = args.direpid
+dirname = args.direpid
 
 # filename1=args.epid1
 # filename2=args.epid2
@@ -483,11 +477,11 @@ while True:  # example of infinite loops using try and except to catch only numb
         if ioption.startswith(('y', 'yeah', 'yes', 'n', 'no', 'nope')):
             break
 
-    except:
+    except: #pylint: disable = bare-except
         print('Please enter a valid option:')
 
 
 
 
 # read_dicom(filename1,filename2,ioption)
-read_dicom(dirname,ioption)
+read_dicom(dirname)
