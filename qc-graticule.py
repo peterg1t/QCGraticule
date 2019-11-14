@@ -84,7 +84,7 @@ def running_mean(x, N):
     return out
 
 
-# axial visualization and scrolling
+# axial visualization and scrolling of the center points
 def viewer(volume, dx, dy, center, title, textstr):
     # remove_keymap_conflicts({'j', 'k'})
     fig = plt.figure(figsize=(12, 7))
@@ -105,9 +105,6 @@ def viewer(volume, dx, dy, center, title, textstr):
     # fig.suptitle('Image', fontsize=16)
     print(title[0])
     ax.set_title(title[0] + "\n" + title[1], fontsize=16)
-
-    # for i in range(0,len(poly)): #maybe at a later stage we will add polygons drawings
-    #     ax.add_patch(poly[i])
     ax.text((volume.shape[1] + 250) * dx, (volume.shape[0]) * dy, textstr)
     fig.subplots_adjust(right=0.75)
     fig.colorbar(img, ax=ax, orientation="vertical")
@@ -123,30 +120,28 @@ def viewer(volume, dx, dy, center, title, textstr):
 
 
 
+
+
+
+
+
 def scalingAnalysis(ArrayDicom_o, dx, dy):  # determine scaling
     ArrayDicom = u.norm01(ArrayDicom_o)
     blobs_log = blob_log(
         ArrayDicom, min_sigma=1, max_sigma=5, num_sigma=20, threshold=0.15
     )  # run on windows, for some stupid reason exclude_border is not recognized in my distro at home
 
-    print('list of blobs on image',blobs_log)
-    exit(0)
     point_det = []
     for blob in blobs_log:
-        print(blob)
-        y, x, r, _ = blob
+        y, x, r = blob
         point_det.append((x, y, r))
+
+
 
     point_det = sorted(
         point_det, key=itemgetter(2), reverse=True
     )  # here we sort by the radius of the dot bigger dots are around the center and edges
 
-    print(
-        point_det[:6]
-    )  # print the first six points, all the points and only the first component
-    print(
-        np.asarray(point_det)[:6, 0]
-    )  # print the first six points, all the points and only the first component
     point_det = np.asarray(point_det)
 
     # now we need to select the most extreme left and right point
@@ -158,6 +153,7 @@ def scalingAnalysis(ArrayDicom_o, dx, dy):  # determine scaling
             point_sel.append(abs(point_det[i, :]))
 
     point_sel = np.asarray(point_sel)
+
     imax = np.argmax(point_sel[:, 0])
     imin = np.argmin(point_sel[:, 0])
 
@@ -175,9 +171,58 @@ def scalingAnalysis(ArrayDicom_o, dx, dy):  # determine scaling
         )
         / 10.0
     )
+
     print("distance=", distance, "cm")  # distance is reported in cm
 
-    return distance
+
+
+    #plotting the figure of scaling results
+
+    fig = plt.figure(figsize=(12, 7))
+    ax = fig.subplots()
+    ax.volume = ArrayDicom_o
+    width = ArrayDicom_o.shape[1]
+    height = ArrayDicom_o.shape[0]
+    extent = (0, 0 + (width * dx), 0, 0 + (height * dy))
+    img = ax.imshow(ArrayDicom_o, extent=extent, origin="lower")
+    # img = ax.imshow(ArrayDicom_o)
+    ax.set_xlabel("x distance [mm]")
+    ax.set_ylabel("y distance [mm]")
+
+    ax.scatter(point_sel[imax, 0]*dx, point_sel[imax, 1]*dy)
+    ax.scatter(point_sel[imin, 0]*dx, point_sel[imin, 1]*dy)
+
+    # adding a horizontal arrow
+    ax.annotate(
+        s="",
+        xy=(point_sel[imax, 0]*dx, point_sel[imax, 1]*dy),
+        xytext=(point_sel[imin, 0]*dx, point_sel[imin, 1]*dy),
+        arrowprops=dict(arrowstyle="<->", color="r"),
+    )  # example on how to plot a double headed arrow
+    ax.text(
+        (width // 2.8) * dx,
+        (height // 2 + 10) * dy,
+        "Distance=" + str(round(distance, 4)) + " cm",
+        rotation=0,
+        fontsize=14,
+        color="r",
+    )
+
+
+
+    return distance, fig
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def full_imageProcess(ArrayDicom_o, dx, dy, title):  # process a full image
@@ -324,6 +369,7 @@ def read_dicom(directory):
         center_g0 = [(0, 0)]
         dx = 0
         dy = 0
+        distance = 0
 
         k = 0  # we callect all the images in ArrayDicom
         for file in tqdm(sorted(files)):
@@ -346,8 +392,6 @@ def read_dicom(directory):
                     title = ("g" + str(round(gantry_angle)), "c" + str(round(collimator_angle)))
                     list_title.append(title)
                     ArrayDicom = dataset.pixel_array
-                    distance = scalingAnalysis(ArrayDicom, dx, dy)
-                    print('distance=',distance,'cm')
                     # height = np.shape(ArrayDicom)[0]
                     # width = np.shape(ArrayDicom)[1]
                     SID = dataset.RTImageSID
@@ -355,6 +399,7 @@ def read_dicom(directory):
                     dy = 1 / (SID * (1 / dataset.ImagePlanePixelSpacing[1]) / 1000)
                     print("pixel spacing row [mm]=", dx)
                     print("pixel spacing col [mm]=", dy)
+                    distance, fig_scaling = scalingAnalysis(ArrayDicom, dx, dy)
 
                 else:
                     list_title.append(title)
@@ -410,15 +455,17 @@ def read_dicom(directory):
             ax_g0c90.legend(bbox_to_anchor=(1.25, 1), loc=2, borderaxespad=0.0)
 
     with PdfPages(directory + "/" + "Graticule_report.pdf") as pdf:
+        # Page = plt.figure(figsize=(4, 5))
+        # Page.text(0, 0.9, 'Report', size=18)
+        # Page.text(0, 0.9, "Distance=" + str(distance)+ " cm", size=14)
         pdf.savefig(fig_g0c90)
-        Page = plt.figure(figsize=(4, 5))
-        Page.text(0.45, 0.9, 'Report', size=18)
-        Page.text(str(scalingAnalysis(ArrayDicom, dx, dy))+' cm')
+        pdf.savefig(fig_scaling)
 
     # exit(0)
     sys.exit(0)
 
-    plt.show()
+    
+
 
 
 parser = argparse.ArgumentParser()  # pylint: disable = invalid-name
