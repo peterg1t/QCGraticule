@@ -383,7 +383,6 @@ def read_dicom(directory):
                 list_gantry_angle.append(gantry_angle)
                 list_collimator_angle.append(collimator_angle)
 
-                print('gantry_angle=',gantry_angle)
                 if round(gantry_angle)==360:
                     gantry_angle=0
 
