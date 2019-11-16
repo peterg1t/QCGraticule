@@ -385,6 +385,8 @@ def read_dicom(directory):
 
                 if round(gantry_angle)==360:
                     gantry_angle=0
+                if round(collimator_angle)==360:
+                    collimator_angle=0
 
                 title = ("g" + str(round(gantry_angle)), "c" + str(round(collimator_angle)))
                 print(title)
