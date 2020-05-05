@@ -371,7 +371,7 @@ def read_dicom(directory):
 
         k = 0  # we callect all the images in ArrayDicom
         for file in tqdm(sorted(files)):
-            print(file)
+            print('Reading file=>',file)
 
             if os.path.splitext(directory + file)[1] == ".dcm":
                 dataset = pydicom.dcmread(directory + file)
