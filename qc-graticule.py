@@ -328,8 +328,6 @@ def point_detect_singleImage(imcirclist):
     blobs_log = blob_log(
         grey_img, min_sigma=15, max_sigma=50, num_sigma=10, threshold=0.05
     )
-    # print(blobs_log)
-    # exit(0)
 
     centerXRegion = []
     centerYRegion = []
@@ -342,8 +340,6 @@ def point_detect_singleImage(imcirclist):
         centerYRegion.append(y)
         centerRRegion.append(r)
         grey_ampRegion.append(grey_img[int(y), int(x)])
-        # radius = int(r)
-        # print('center=', center, 'radius=', radius, 'value=', img[center], grey_img[center])
 
     xindx = int(centerXRegion[np.argmin(grey_ampRegion)])
     yindx = int(centerYRegion[np.argmin(grey_ampRegion)])
@@ -416,7 +412,6 @@ def read_dicom(directory):
             k = k + 1
 
     # After we colect all the images we only select g0c90 and g0c270 to calculate the center at g0
-    print(list_title)
 
 
 
@@ -477,6 +472,11 @@ def read_dicom(directory):
                 center_g270[0][0] + center_g270c[0][0] ,
                 center_g270[0][1] + center_g270c[0][1] ,
             )
+
+    print(k,'images used for g0')
+    print(l,'images used for g90')
+    print(m,'images used for g180')
+    print(n,'images used for g270')
 
 
     center_g0[0]=(center_g0[0][0]/k,center_g0[0][1]/k)
