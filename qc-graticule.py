@@ -409,7 +409,8 @@ def read_dicom(directory):
                     tmp_array = u.norm01(tmp_array)
                     ArrayDicom = np.dstack((ArrayDicom, tmp_array))
 
-            k = k + 1
+                k = k + 1
+
 
     # After we colect all the images we only select g0c90 and g0c270 to calculate the center at g0
 
