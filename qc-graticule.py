@@ -52,6 +52,7 @@
 import os
 import sys
 import argparse
+from datetime import datetime
 import pydicom
 from operator import itemgetter
 from math import sqrt
@@ -62,7 +63,8 @@ import numpy as np
 from skimage.feature import blob_log
 import utils as u
 from PIL import Image
-
+import operator
+from sys import platform
 
 
 
@@ -109,12 +111,7 @@ def viewer(volume, dx, dy, center, title, textstr):
     fig.subplots_adjust(right=0.75)
     fig.colorbar(img, ax=ax, orientation="vertical")
     # fig.canvas.mpl_connect('key_press_event', process_key_axial)
-    for x, y in center:
-        # ax.scatter(x,y)
-        # ax.scatter(x*dx+dx/2,(volume.shape[0]-y)*dy-dy/2) #adding dx/2 and subtracting dy/2 correctly puts the point in the center of the pixel when using extents and not in the edge.
-        ax.scatter(
-            x * dx, (volume.shape[0] - y) * dy, label=title, color="k"
-        )  # perfect!
+
 
     return fig, ax
 
@@ -360,13 +357,18 @@ def point_detect_singleImage(imcirclist):
 
 # def read_dicom(filename1,filename2,ioption):
 def read_dicom(directory):
+    now = datetime.now()
     for subdir, dirs, files in os.walk(directory):  # pylint: disable = unused-variable
+        dirs.clear()
         list_title = []
         list_gantry_angle = []
         list_collimator_angle = []
         list_figs = []
-        # center_g0c90 = [(0, 0)]
+        center=[]
         center_g0 = [(0, 0)]
+        center_g90 = [(0, 0)]
+        center_g180 = [(0, 0)]
+        center_g270 = [(0, 0)]
         dx = 0
         dy = 0
         distance = 0
@@ -396,8 +398,8 @@ def read_dicom(directory):
                     title = ("g" + str(round(gantry_angle)), "c" + str(round(collimator_angle)))
                     list_title.append(title)
                     ArrayDicom = dataset.pixel_array
-                    # height = np.shape(ArrayDicom)[0]
-                    # width = np.shape(ArrayDicom)[1]
+                    height = np.shape(ArrayDicom)[0]
+                    width = np.shape(ArrayDicom)[1]
                     SID = dataset.RTImageSID
                     dx = 1 / (SID * (1 / dataset.ImagePlanePixelSpacing[0]) / 1000)
                     dy = 1 / (SID * (1 / dataset.ImagePlanePixelSpacing[1]) / 1000)
@@ -415,50 +417,181 @@ def read_dicom(directory):
 
     # After we colect all the images we only select g0c90 and g0c270 to calculate the center at g0
     print(list_title)
+
+
+
+    k=0
+    l=0
+    m=0
+    n=0
+
+
+
     for i, _ in enumerate(list_title):
-        if list_title[i][0] == "g0" and list_title[i][1] == "c90":
+        if list_title[i][0] == "g0" and k == 0:
+            k=k+1
             # height = np.shape(ArrayDicom[:, :, i])[0]
             # width = np.shape(ArrayDicom[:, :, i])[1]
             fig_g0c90, ax_g0c90, center_g0c90 = full_imageProcess(
                 ArrayDicom[:, :, i], dx, dy, list_title[i]
             )
             center_g0[0] = (
-                center_g0[0][0] + center_g0c90[0][0] * 0.5,
-                center_g0[0][1] + center_g0c90[0][1] * 0.5,
+                center_g0[0][0] + center_g0c90[0][0] ,
+                center_g0[0][1] + center_g0c90[0][1] ,
             )
 
             list_figs.append(fig_g0c90)  # we plot always the image at g0c90
 
-        if list_title[i][0] == "g0" and list_title[i][1] == "c270":
+        if list_title[i][0] == "g0" and k != 0:
+            k=k+1
             center_g0c270 = full_imageProcess_noGraph(ArrayDicom[:, :, i])
             center_g0[0] = (
-                center_g0[0][0] + center_g0c270[0][0] * 0.5,
-                center_g0[0][1] + center_g0c270[0][1] * 0.5,
+                center_g0[0][0] + center_g0c270[0][0] ,
+                center_g0[0][1] + center_g0c270[0][1] ,
             )
 
-    # for i in range(0, len(list_title)):
+
+
+
     for i, _ in enumerate(list_title):
-        if list_title[i][1] != "c90":
-            center = full_imageProcess_noGraph(ArrayDicom[:, :, i])
-
-            x_g0, y_g0 = center_g0[0]
-            x, y = center[0]
-
-            dist = sqrt(
-                (x_g0 - x) * (x_g0 - x) * dx * dx + (y_g0 - y) * (y_g0 - y) * dy * dy
+        if list_title[i][0] == "g90":
+            l=l+1
+            center_g90c = full_imageProcess_noGraph(ArrayDicom[:, :, i])
+            center_g90[0] = (
+                center_g90[0][0] + center_g90c[0][0] ,
+                center_g90[0][1] + center_g90c[0][1] ,
             )
-            # dist = sqrt((width//2 - x) * (width//2 - x) * dx * dx + (height//2 - y) * (height//2 - y) * dy * dy)
 
-            textstr = "offset" + str(list_title[i]) + "=" + str(round(dist, 4)) + " mm"
+        if list_title[i][0] == "g180":
+            m=m+1
+            center_g180c = full_imageProcess_noGraph(ArrayDicom[:, :, i])
+            center_g180[0] = (
+                center_g180[0][0] + center_g180c[0][0] ,
+                center_g180[0][1] + center_g180c[0][1] ,
+            )
 
-            ax_g0c90.scatter(
-                x * dx, (ArrayDicom[:, :, i].shape[0] - y) * dy, label=textstr
-            )  # perfect!
+        if list_title[i][0] == "g270":
+            n=n+1
+            center_g270c = full_imageProcess_noGraph(ArrayDicom[:, :, i])
+            center_g270[0] = (
+                center_g270[0][0] + center_g270c[0][0] ,
+                center_g270[0][1] + center_g270c[0][1] ,
+            )
 
-            print(list_title[i], "center_g0c90=", center_g0c90, "center=", center, dist)
-            ax_g0c90.legend(bbox_to_anchor=(1.25, 1), loc=2, borderaxespad=0.0)
 
-    with PdfPages(directory + "/" + "Graticule_report.pdf") as pdf:
+    center_g0[0]=(center_g0[0][0]/k,center_g0[0][1]/k)
+    center_g90[0]=(center_g90[0][0]/l,center_g90[0][1]/l)
+    center_g180[0]=(center_g180[0][0]/m,center_g180[0][1]/m)
+    center_g270[0]=(center_g270[0][0]/n,center_g270[0][1]/n)
+
+    center.append(center_g0[0])
+    center.append(center_g90[0])
+    center.append(center_g180[0])
+    center.append(center_g270[0])
+
+
+    x_g0, y_g0 = center_g0[0]
+    x_g90, y_g90 = center_g90[0]
+    x_g180, y_g180 = center_g180[0]
+    x_g270, y_g270 = center_g270[0]
+
+    max_deltax=0
+    max_deltay = 0
+    for i in range(0,len(center)):
+        for j in range(i+1,len(center)):
+            deltax = abs(center[i][0]-center[j][0])
+            deltay = abs(center[i][1] - center[j][1])
+            if deltax > max_deltax:
+                max_deltax=deltax
+            if deltay > max_deltay:
+                max_deltay = deltay
+
+    print('Maximum delta x =',max_deltax*dx,'mm')
+    print('Maximum delta y =', max_deltay*dy,'mm')
+
+
+
+
+    ax_g0c90.scatter(
+            x_g0 * dx, (ArrayDicom[:, :, i].shape[0] - y_g0) * dy, label='g=0'
+        )  # perfect!
+
+    ax_g0c90.scatter(
+            x_g90 * dx, (ArrayDicom[:, :, i].shape[0] - y_g90) * dy, label='g=90'
+        )  # perfect!
+    ax_g0c90.scatter(
+            x_g180 * dx, (ArrayDicom[:, :, i].shape[0] - y_g180) * dy, label='g=180'
+        )  # perfect!
+    ax_g0c90.scatter(
+            x_g270 * dx, (ArrayDicom[:, :, i].shape[0] - y_g270) * dy, label='g=270'
+        )  # perfect!
+
+        # print(list_title[i], "center_g0c90=", center_g0c90, "center=", center, dist)
+    ax_g0c90.legend(bbox_to_anchor=(1.25, 1), loc=2, borderaxespad=0.0)
+
+
+
+    # adding a horizontal arrow
+    # ax.annotate(
+    #     s="",
+    #     xy=(point_sel[imax, 0] * dx, point_sel[imax, 1] * dy),
+    #     xytext=(point_sel[imin, 0] * dx, point_sel[imin, 1] * dy),
+    #     arrowprops=dict(arrowstyle="<->", color="r"),
+    # )  # example on how to plot a double headed arrow
+    ax_g0c90.text(
+        (width // 2.15) * dx,
+        (height // 2.15) * dy,
+        "Maximum delta x =" + str(round(max_deltax*dx,4)) + " mm",
+        rotation=0,
+        fontsize=14,
+        color="r",
+    )
+    ax_g0c90.text(
+        (width // 2.15) * dx,
+        (height // 2.18) * dy,
+        "Maximum delta y =" + str(round(max_deltay*dy,4)) + " mm",
+        rotation=0,
+        fontsize=14,
+        color="r",
+    )
+
+
+
+
+
+
+
+
+
+
+    # # for i in range(0, len(list_title)):
+    # for i, _ in enumerate(list_title):
+    #     if list_title[i][1] != "c90":
+    #         center = full_imageProcess_noGraph(ArrayDicom[:, :, i])
+    #
+    #         x_g0, y_g0 = center_g0[0]
+    #         x, y = center[0]
+    #
+    #         dist = sqrt(
+    #             (x_g0 - x) * (x_g0 - x) * dx * dx + (y_g0 - y) * (y_g0 - y) * dy * dy
+    #         )
+    #         # dist = sqrt((width//2 - x) * (width//2 - x) * dx * dx + (height//2 - y) * (height//2 - y) * dy * dy)
+    #
+    #         textstr = "offset" + str(list_title[i]) + "=" + str(round(dist, 4)) + " mm"
+    #
+    #         ax_g0c90.scatter(
+    #             x * dx, (ArrayDicom[:, :, i].shape[0] - y) * dy, label=textstr
+    #         )  # perfect!
+    #
+    #         print(list_title[i], "center_g0c90=", center_g0c90, "center=", center, dist)
+    #         ax_g0c90.legend(bbox_to_anchor=(1.25, 1), loc=2, borderaxespad=0.0)
+    if platform == "linux":
+        output_flnm=dirname+ "/"+ now.strftime("%d-%m-%Y_%H:%M_")+ dataset[0x0008, 0x1010].value+ "_Graticule_report.pdf"
+    elif platform == "win32":
+        output_flnm=dataset[0x0008, 0x1010].value+ "_Graticule_report.pdf"
+
+    #with PdfPages(directory + "/" + output_flnm) as pdf:
+    with PdfPages(output_flnm) as pdf:
         # Page = plt.figure(figsize=(4, 5))
         # Page.text(0, 0.9, 'Report', size=18)
         # Page.text(0, 0.9, "Distance=" + str(distance)+ " cm", size=14)
