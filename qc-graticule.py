@@ -1,28 +1,17 @@
 #############################START LICENSE##########################################
 # Copyright (C) 2019 Pedro Martinez
 #
-# # This program is free software: you can redistribute it and/or modify
-# # it under the terms of the GNU Affero General Public License as published
-# # by the Free Software Foundation, either version 3 of the License, or
-# # (at your option) any later version (the "AGPL-3.0+").
-#
-# # This program is distributed in the hope that it will be useful,
-# # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-# # GNU Affero General Public License and the additional terms for more
-# # details.
-#
-# # You should have received a copy of the GNU Affero General Public License
-# # along with this program. If not, see <http://www.gnu.org/licenses/>.
-#
-# # ADDITIONAL TERMS are also included as allowed by Section 7 of the GNU
-# # Affero General Public License. These additional terms are Sections 1, 5,
-# # 6, 7, 8, and 9 from the Apache License, Version 2.0 (the "Apache-2.0")
-# # where all references to the definition "License" are instead defined to
-# # mean the AGPL-3.0+.
-#
-# # You should have received a copy of the Apache-2.0 along with this
-# # program. If not, see <http://www.apache.org/licenses/LICENSE-2.0>.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 #############################END LICENSE##########################################
 
 
@@ -35,17 +24,16 @@
 #
 #   Example usage: python qc-graticule "/folder/"
 #
-#   The folder should contain:
-#   1 image at g=0, c=90
-#   1 image at g=0, c=270
-#   1 image at g=90, c=270
-#   1 image at g=180, c=270
-#   1 image at g=270, c=270
+#   The folder can contain:
+#   1/2 image(s) at g=0
+#   1/2 image(s) at g=90
+#   1/2 image(s) at g=180
+#   1/2 image(s) at g=270
 #
 #   Author: Pedro Martinez
 #   pedro.enrique.83@gmail.com
 #   5877000722
-#   Date:2019-04-09
+#   Date:2020-05-12
 #
 ###########################################################################################
 
@@ -105,7 +93,6 @@ def viewer(volume, dx, dy, center, title, textstr):
     ax.set_ylim(height * dy / 2 - 10, height * dy / 2 + 10)
 
     # fig.suptitle('Image', fontsize=16)
-    print(title[0])
     ax.set_title(title[0] + "\n" + title[1], fontsize=16)
     ax.text((volume.shape[1] + 250) * dx, (volume.shape[0]) * dy, textstr)
     fig.subplots_adjust(right=0.75)
@@ -122,7 +109,7 @@ def viewer(volume, dx, dy, center, title, textstr):
 
 
 
-def scalingAnalysis(ArrayDicom_o, dx, dy):  # determine scaling
+def scalingAnalysis(ArrayDicom_o, dx, dy,title):  # determine scaling
     ArrayDicom = u.norm01(ArrayDicom_o)
     blobs_log = blob_log(
         ArrayDicom, min_sigma=1, max_sigma=5, num_sigma=20, threshold=0.15
@@ -142,8 +129,8 @@ def scalingAnalysis(ArrayDicom_o, dx, dy):  # determine scaling
     point_det = np.asarray(point_det)
 
     # now we need to select the most extreme left and right point
-    print(np.shape(ArrayDicom)[0] // 2)
-    print(abs(point_det[:6, 1] - np.shape(ArrayDicom)[0] // 2) < 10)
+    #print(np.shape(ArrayDicom)[0] // 2)
+    #print(abs(point_det[:6, 1] - np.shape(ArrayDicom)[0] // 2) < 10)
     point_sel = []
     for i in range(0, 6):
         if abs(point_det[i, 1] - np.shape(ArrayDicom)[0] // 2) < 10:
@@ -154,7 +141,7 @@ def scalingAnalysis(ArrayDicom_o, dx, dy):  # determine scaling
     imax = np.argmax(point_sel[:, 0])
     imin = np.argmin(point_sel[:, 0])
 
-    print(point_sel[imax, :], point_sel[imin, :])
+    #print(point_sel[imax, :], point_sel[imin, :])
     distance = (
         np.sqrt(
             (point_sel[imax, 0] - point_sel[imin, 0])
@@ -185,6 +172,7 @@ def scalingAnalysis(ArrayDicom_o, dx, dy):  # determine scaling
     # img = ax.imshow(ArrayDicom_o)
     ax.set_xlabel("x distance [mm]")
     ax.set_ylabel("y distance [mm]")
+    ax.set_title(title[0] + "\n" + title[1], fontsize=16)
 
     ax.scatter(point_sel[imax, 0]*dx, point_sel[imax, 1]*dy)
     ax.scatter(point_sel[imin, 0]*dx, point_sel[imin, 1]*dy)
@@ -196,6 +184,7 @@ def scalingAnalysis(ArrayDicom_o, dx, dy):  # determine scaling
         xytext=(point_sel[imin, 0]*dx, point_sel[imin, 1]*dy),
         arrowprops=dict(arrowstyle="<->", color="r"),
     )  # example on how to plot a double headed arrow
+
     ax.text(
         (width // 2.8) * dx,
         (height // 2 + 10) * dy,
@@ -204,7 +193,6 @@ def scalingAnalysis(ArrayDicom_o, dx, dy):  # determine scaling
         fontsize=14,
         color="r",
     )
-
 
 
     return distance, fig
@@ -266,7 +254,7 @@ def full_imageProcess(ArrayDicom_o, dx, dy, title):  # process a full image
 
     textstr = ""
 
-    print("center=", center)
+    #print("center=", center)
     fig, ax = viewer(u.range_invert(ArrayDicom_o), dx, dy, center, title, textstr)
 
     return fig, ax, center
@@ -323,7 +311,7 @@ def point_detect_singleImage(imcirclist):
     detCenterXRegion = []
     detCenterYRegion = []
 
-    print("Finding bibs in phantom...")
+    #print("Finding bibs in phantom...")
     grey_img = np.array(imcirclist, dtype=np.uint8)  # converting the image to grayscale
     blobs_log = blob_log(
         grey_img, min_sigma=15, max_sigma=50, num_sigma=10, threshold=0.05
@@ -368,6 +356,7 @@ def read_dicom(directory):
         dx = 0
         dy = 0
         distance = 0
+        scaling_image=[]
 
         k = 0  # we callect all the images in ArrayDicom
         for file in tqdm(sorted(files)):
@@ -401,13 +390,17 @@ def read_dicom(directory):
                     dy = 1 / (SID * (1 / dataset.ImagePlanePixelSpacing[1]) / 1000)
                     print("pixel spacing row [mm]=", dx)
                     print("pixel spacing col [mm]=", dy)
-                    distance, fig_scaling = scalingAnalysis(ArrayDicom, dx, dy)
+                    distance, fig_scaling = scalingAnalysis(ArrayDicom, dx, dy,title)
+                    scaling_image.append(fig_scaling)
 
                 else:
                     list_title.append(title)
                     tmp_array = dataset.pixel_array
                     tmp_array = u.norm01(tmp_array)
                     ArrayDicom = np.dstack((ArrayDicom, tmp_array))
+                    distance, fig_scaling = scalingAnalysis(tmp_array, dx, dy,title)
+                    scaling_image.append(fig_scaling)
+                    print('here',title,list_title)
 
                 k = k + 1
 
@@ -438,7 +431,7 @@ def read_dicom(directory):
 
             list_figs.append(fig_g0c90)  # we plot always the image at g0c90
 
-        if list_title[i][0] == "g0" and k != 0:
+        elif list_title[i][0] == "g0" and k != 0:
             k=k+1
             center_g0c270 = full_imageProcess_noGraph(ArrayDicom[:, :, i])
             center_g0[0] = (
@@ -565,27 +558,7 @@ def read_dicom(directory):
 
 
 
-    # # for i in range(0, len(list_title)):
-    # for i, _ in enumerate(list_title):
-    #     if list_title[i][1] != "c90":
-    #         center = full_imageProcess_noGraph(ArrayDicom[:, :, i])
-    #
-    #         x_g0, y_g0 = center_g0[0]
-    #         x, y = center[0]
-    #
-    #         dist = sqrt(
-    #             (x_g0 - x) * (x_g0 - x) * dx * dx + (y_g0 - y) * (y_g0 - y) * dy * dy
-    #         )
-    #         # dist = sqrt((width//2 - x) * (width//2 - x) * dx * dx + (height//2 - y) * (height//2 - y) * dy * dy)
-    #
-    #         textstr = "offset" + str(list_title[i]) + "=" + str(round(dist, 4)) + " mm"
-    #
-    #         ax_g0c90.scatter(
-    #             x * dx, (ArrayDicom[:, :, i].shape[0] - y) * dy, label=textstr
-    #         )  # perfect!
-    #
-    #         print(list_title[i], "center_g0c90=", center_g0c90, "center=", center, dist)
-    #         ax_g0c90.legend(bbox_to_anchor=(1.25, 1), loc=2, borderaxespad=0.0)
+
     if platform == "linux":
         output_flnm=dirname+ "/"+ now.strftime("%d-%m-%Y_%H:%M_")+ dataset[0x0008, 0x1010].value+ "_Graticule_report.pdf"
     elif platform == "win32":
@@ -597,19 +570,19 @@ def read_dicom(directory):
         # Page.text(0, 0.9, 'Report', size=18)
         # Page.text(0, 0.9, "Distance=" + str(distance)+ " cm", size=14)
         pdf.savefig(fig_g0c90)
-        pdf.savefig(fig_scaling)
+        for img in scaling_image:
+            pdf.savefig(img)
 
     # exit(0)
     sys.exit(0)
 
     
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()  # pylint: disable = invalid-name
+    parser.add_argument("-d", "--directory", help="path to folder")
+    args = parser.parse_args()  # pylint: disable = invalid-name
 
-
-parser = argparse.ArgumentParser()  # pylint: disable = invalid-name
-parser.add_argument("-d", "--directory", help="path to folder")
-args = parser.parse_args()  # pylint: disable = invalid-name
-
-if args.directory:
-    dirname = args.directory  # pylint: disable = invalid-name
-    read_dicom(dirname)
+    if args.directory:
+        dirname = args.directory  # pylint: disable = invalid-name
+        read_dicom(dirname)
