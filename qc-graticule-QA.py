@@ -166,7 +166,7 @@ def viewer(volume, dx, dy, center, title, textstr):
     ax.set_ylim(height * dy / 2 - 10, height * dy / 2 + 10)
 
     # fig.suptitle('Image', fontsize=16)
-    ax.set_title("Isocenter Analysis", fontsize=16)
+    ax.set_title("Image Center Analysis", fontsize=16)
     ax.text((volume.shape[1] + 250) * dx, (volume.shape[0]) * dy, textstr)
     fig2.subplots_adjust(right=0.75)
     fig2.colorbar(img, ax=ax, orientation="vertical")
@@ -321,6 +321,7 @@ def read_dicom(directory):
         distance = 0
         scaling_image = []
         k = 0
+
         for file in files:
             if os.path.splitext(directory + file)[1] == ".dcm":
 
@@ -373,6 +374,9 @@ def read_dicom(directory):
                     scaling_image.append(fig_scaling)
 
                 k = k + 1
+
+                # Delete the file afterwords
+                os.remove(directory + file)
 
     # After we colect all the images we only select g0c90 and g0c270 to calculate the center at g0
     k = 0
