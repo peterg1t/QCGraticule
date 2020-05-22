@@ -10,7 +10,6 @@ from matplotlib.backends.backend_pdf import PdfPages
 import pydicom
 import matplotlib
 import matplotlib.figure
-from collections import OrderedDict
 import numpy as np
 from skimage.feature import blob_log
 from PIL import Image
@@ -106,6 +105,8 @@ def scalingAnalysis(ArrayDicom_o, dx, dy, title):  # determine scaling
         )
         / 10.0
     )
+    
+    dz = 10*(distance - 10)
 
     # Plot the figure of scaling results and attach to QA+
     fig = UTILS.get_figure()
@@ -135,8 +136,16 @@ def scalingAnalysis(ArrayDicom_o, dx, dy, title):  # determine scaling
 
     ax.text(
         (width // 2.8) * dx,
-        (height // 2 + 10) * dy,
+        (height // 2 + 12) * dy,
         "Distance=" + str(round(distance, 4)) + " cm",
+        rotation=0,
+        fontsize=14,
+        color="r",
+    )
+    ax.text(
+        (width // 2.8) * dx,
+        (height // 2 - 30) * dy,
+        r"$\Delta$z=" + str(round(dz, 4)) + " cm",
         rotation=0,
         fontsize=14,
         color="r",
@@ -145,7 +154,7 @@ def scalingAnalysis(ArrayDicom_o, dx, dy, title):  # determine scaling
     # Attach to QA+
     UTILS.write_file(plot_title + ".png", ax)
 
-    return distance, fig
+    return distance, fig, dz
 
 
 def viewer(volume, dx, dy, center, title, textstr):
@@ -318,6 +327,7 @@ def read_dicom(directory):
         center_g270 = [(0, 0)]
         dx = 0
         dy = 0
+        dzs = []
         distance = 0
         scaling_image = []
         k = 0
@@ -362,17 +372,19 @@ def read_dicom(directory):
                     # Pixel Spacing to convert pixels to real world dimensions
                     dx = 1 / (SID * (1 / dataset.ImagePlanePixelSpacing[0]) / 1000)
                     dy = 1 / (SID * (1 / dataset.ImagePlanePixelSpacing[1]) / 1000)
-                    _, fig_scaling = scalingAnalysis(ArrayDicom, dx, dy, title)
+                    _, fig_scaling, dz = scalingAnalysis(ArrayDicom, dx, dy, title)
                     scaling_image.append(fig_scaling)
+                    
 
                 else:
                     list_title.append(title)
                     tmp_array = dataset.pixel_array
                     tmp_array = norm01(tmp_array)
                     ArrayDicom = np.dstack((ArrayDicom, tmp_array))
-                    _, fig_scaling = scalingAnalysis(tmp_array, dx, dy, title)
+                    _, fig_scaling, dz = scalingAnalysis(tmp_array, dx, dy, title)
                     scaling_image.append(fig_scaling)
-
+                    
+                dzs.append(dz)
                 k = k + 1
 
                 # Delete the file afterwords
@@ -449,6 +461,7 @@ def read_dicom(directory):
 
     max_deltax = 0
     max_deltay = 0
+    max_deltaz = 0
     for i in range(0, len(center)):
         for j in range(i + 1, len(center)):
             deltax = abs(center[i][0] - center[j][0])
@@ -457,10 +470,15 @@ def read_dicom(directory):
                 max_deltax = deltax
             if deltay > max_deltay:
                 max_deltay = deltay
-
+    
+    #Calculate the max dz
+    abs_dzs = list(map(abs,dzs))
+    max_deltaz = dzs[abs_dzs.index(max(abs_dzs))]
+    
     # Save the calculated answers to the output dictionary for output into other QA+ composites
     graticule_upload_analysis["Max Delta X"] = max_deltax * dx
     graticule_upload_analysis["Max Delta Y"] = max_deltay * dy
+    graticule_upload_analysis["Max Delta Z"] = max_deltaz
 
     ax_g0c90.scatter(
         x_g0 * dx, (ArrayDicom[:, :, i].shape[0] - y_g0) * dy, label="g=0"
@@ -488,7 +506,7 @@ def read_dicom(directory):
     # )  # example on how to plot a double headed arrow
     ax_g0c90.text(
         (width // 2.15) * dx,
-        (height // 2.15) * dy,
+        (height // 2.13) * dy,
         "Maximum delta x =" + str(round(max_deltax * dx, 4)) + " mm",
         rotation=0,
         fontsize=14,
@@ -496,8 +514,16 @@ def read_dicom(directory):
     )
     ax_g0c90.text(
         (width // 2.15) * dx,
-        (height // 2.18) * dy,
+        (height // 2.16) * dy,
         "Maximum delta y =" + str(round(max_deltay * dy, 4)) + " mm",
+        rotation=0,
+        fontsize=14,
+        color="r",
+    )
+    ax_g0c90.text(
+        (width // 2.15) * dx,
+        (height // 2.19) * dy,
+        "Maximum delta z =" + str(round(max_deltaz, 4)) + " cm",
         rotation=0,
         fontsize=14,
         color="r",
