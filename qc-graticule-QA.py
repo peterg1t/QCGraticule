@@ -473,7 +473,7 @@ def read_dicom(directory):
     
     #Calculate the max dz
     abs_dzs = list(map(abs,dzs))
-    max_deltaz = dzs[abs_dzs.index(max(abs_dzs))]
+    max_deltaz = dzs[abs_dzs.index(max(abs_dzs))]*10
     
     # Save the calculated answers to the output dictionary for output into other QA+ composites
     graticule_upload_analysis["Max Delta X"] = max_deltax * dx
@@ -523,14 +523,14 @@ def read_dicom(directory):
     ax_g0c90.text(
         (width // 2.15) * dx,
         (height // 2.19) * dy,
-        "Maximum delta z =" + str(round(max_deltaz, 4)) + " cm",
+        "Maximum delta z =" + str(round(max_deltaz, 4)) + " mm",
         rotation=0,
         fontsize=14,
         color="r",
     )
 
     # Attach ax_g0c90 to QA+
-    UTILS.write_file("isocenter_results.png", ax_g0c90)
+    UTILS.write_file("image_center_results.png", ax_g0c90)
 
 
 # Load the zip file and unpack into a temporary folder
