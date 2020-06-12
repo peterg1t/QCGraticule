@@ -22,7 +22,7 @@
 #
 #   Description: Tool for calculating graticule centre at different gantry angles.
 #
-#   Example usage: python qc-graticule "/folder/"
+#   Example usage: python qc-graticule -d "/folder/"
 #
 #   The folder can contain:
 #   1/2 image(s) at g=0
@@ -112,7 +112,7 @@ def viewer(volume, dx, dy, center, title, textstr):
 def scalingAnalysis(ArrayDicom_o, dx, dy,title):  # determine scaling
     ArrayDicom = u.norm01(ArrayDicom_o)
     blobs_log = blob_log(
-        ArrayDicom, min_sigma=1, max_sigma=5, num_sigma=20, threshold=0.15
+        ArrayDicom, min_sigma=1, max_sigma=6, num_sigma=20, threshold=0.15
     )  # run on windows, for some stupid reason exclude_border is not recognized in my distro at home
 
     point_det = []
@@ -133,13 +133,14 @@ def scalingAnalysis(ArrayDicom_o, dx, dy,title):  # determine scaling
     #print(abs(point_det[:6, 1] - np.shape(ArrayDicom)[0] // 2) < 10)
     point_sel = []
     for i in range(0, 6):
-        if abs(point_det[i, 1] - np.shape(ArrayDicom)[0] // 2) < 10:
+        if abs(point_det[i, 1] - np.shape(ArrayDicom)[0] // 2) < 15:
             point_sel.append(abs(point_det[i, :]))
 
     point_sel = np.asarray(point_sel)
 
     imax = np.argmax(point_sel[:, 0])
     imin = np.argmin(point_sel[:, 0])
+ #   print(point_sel,imax,imin)
 
     #print(point_sel[imax, :], point_sel[imin, :])
     distance = (
@@ -167,15 +168,15 @@ def scalingAnalysis(ArrayDicom_o, dx, dy,title):  # determine scaling
     ax.volume = ArrayDicom_o
     width = ArrayDicom_o.shape[1]
     height = ArrayDicom_o.shape[0]
-    extent = (0, 0 + (width * dx), 0, 0 + (height * dy))
+    extent = (0, 0 + (width * dx),0, 0 + (height * dy))
     img = ax.imshow(ArrayDicom_o, extent=extent, origin="lower")
-    # img = ax.imshow(ArrayDicom_o)
     ax.set_xlabel("x distance [mm]")
     ax.set_ylabel("y distance [mm]")
     ax.set_title(title[0] + "\n" + title[1], fontsize=16)
 
-    ax.scatter(point_sel[imax, 0]*dx, point_sel[imax, 1]*dy)
-    ax.scatter(point_sel[imin, 0]*dx, point_sel[imin, 1]*dy)
+    ax.scatter((point_sel[imax, 0])*dx+dx/2, (point_sel[imax, 1])*dy+dy/2) #adding dx/2 so the dot is centered in the pixel
+    ax.scatter((point_sel[imin, 0])*dx+dx/2, (point_sel[imin, 1])*dy+dy/2)
+    
 
     # adding a horizontal arrow
     ax.annotate(
