@@ -45,6 +45,7 @@ import pydicom
 from operator import itemgetter
 from math import sqrt
 import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 from matplotlib.backends.backend_pdf import PdfPages
 from tqdm import tqdm
 import numpy as np
@@ -89,8 +90,8 @@ def viewer(volume, dx, dy, center, title, textstr):
     ax.set_ylabel("y distance [mm]")
     # ax.set_xlabel('x pixel')
     # ax.set_ylabel('y pixel')
-    ax.set_xlim(width * dx / 2 - 10, width * dx / 2 + 10)
-    ax.set_ylim(height * dy / 2 - 10, height * dy / 2 + 10)
+    ax.set_xlim((width//2-30) * dx, (width//2+30) * dx)
+    ax.set_ylim((height//2-30) * dy, (height//2+30) * dy)
 
     # fig.suptitle('Image', fontsize=16)
     ax.set_title(title[0] + "\n" + title[1], fontsize=16)
@@ -112,7 +113,7 @@ def viewer(volume, dx, dy, center, title, textstr):
 def scalingAnalysis(ArrayDicom_o, dx, dy,title):  # determine scaling
     ArrayDicom = u.norm01(ArrayDicom_o)
     blobs_log = blob_log(
-        ArrayDicom, min_sigma=1, max_sigma=6, num_sigma=20, threshold=0.15
+        ArrayDicom, min_sigma=1, max_sigma=6, num_sigma=20, threshold=0.2
     )  # run on windows, for some stupid reason exclude_border is not recognized in my distro at home
 
     point_det = []
@@ -121,18 +122,34 @@ def scalingAnalysis(ArrayDicom_o, dx, dy,title):  # determine scaling
         point_det.append((x, y, r))
 
 
-
+    # print(np.shape(point_det))
     point_det = sorted(
         point_det, key=itemgetter(2), reverse=True
     )  # here we sort by the radius of the dot bigger dots are around the center and edges
 
+
     point_det = np.asarray(point_det)
+    # print(point_det)
+    # fig = plt.figure(figsize=(12, 7))
+    # ax = fig.subplots()
+    # ax.volume = ArrayDicom_o
+    # width = ArrayDicom_o.shape[1]
+    # height = ArrayDicom_o.shape[0]
+    # extent = (0, 0 + (width * dx), 0, 0 + (height * dy))
+    # # img = ax.imshow(ArrayDicom_o, extent=extent, origin="lower")
+    # ax.imshow(ArrayDicom_o, origin="lower")
+    # ax.scatter(point_det[:,0],point_det[:,1])
+    # ax.set_xlabel("x distance [mm]")
+    # ax.set_ylabel("y distance [mm]")
+    # ax.set_title(title[0] + "\n" + title[1], fontsize=16)
+    # plt.show(block=True)
+    # exit(0)
 
     # now we need to select the most extreme left and right point
     #print(np.shape(ArrayDicom)[0] // 2)
     #print(abs(point_det[:6, 1] - np.shape(ArrayDicom)[0] // 2) < 10)
     point_sel = []
-    for i in range(0, 6):
+    for i in range(0, 6): # select the 6 largest points
         if abs(point_det[i, 1] - np.shape(ArrayDicom)[0] // 2) < 15:
             point_sel.append(abs(point_det[i, :]))
 
@@ -140,7 +157,6 @@ def scalingAnalysis(ArrayDicom_o, dx, dy,title):  # determine scaling
 
     imax = np.argmax(point_sel[:, 0])
     imin = np.argmin(point_sel[:, 0])
- #   print(point_sel,imax,imin)
 
     #print(point_sel[imax, :], point_sel[imin, :])
     distance = (
@@ -217,7 +233,7 @@ def full_imageProcess(ArrayDicom_o, dx, dy, title):  # process a full image
     width = np.shape(ArrayDicom)[1]
 
     blobs_log = blob_log(
-        ArrayDicom, min_sigma=1, max_sigma=5, num_sigma=20, threshold=0.15
+        ArrayDicom, min_sigma=1, max_sigma=6, num_sigma=20, threshold=0.2
     )  # run on windows, for some stupid reason exclude_border is not recognized in my distro at home
 
     center = []
@@ -255,7 +271,6 @@ def full_imageProcess(ArrayDicom_o, dx, dy, title):  # process a full image
 
     textstr = ""
 
-    #print("center=", center)
     fig, ax = viewer(u.range_invert(ArrayDicom_o), dx, dy, center, title, textstr)
 
     return fig, ax, center
@@ -267,7 +282,7 @@ def full_imageProcess_noGraph(ArrayDicom_o):  # process a full image
     width = np.shape(ArrayDicom)[1]
 
     blobs_log = blob_log(
-        ArrayDicom, min_sigma=1, max_sigma=5, num_sigma=20, threshold=0.15
+        ArrayDicom, min_sigma=1, max_sigma=6, num_sigma=20, threshold=0.20
     )  # run on windows, for some stupid reason exclude_border is not recognized in my distro at home
 
     center = []
@@ -309,35 +324,29 @@ def full_imageProcess_noGraph(ArrayDicom_o):  # process a full image
 
 
 def point_detect_singleImage(imcirclist):
-    detCenterXRegion = []
-    detCenterYRegion = []
-
     #print("Finding bibs in phantom...")
     grey_img = np.array(imcirclist, dtype=np.uint8)  # converting the image to grayscale
     blobs_log = blob_log(
         grey_img, min_sigma=15, max_sigma=50, num_sigma=10, threshold=0.05
     )
 
-    centerXRegion = []
-    centerYRegion = []
-    centerRRegion = []
-    grey_ampRegion = []
+    point_det = []
     for blob in blobs_log:
         y, x, r = blob
-        # center = (int(x), int(y))
-        centerXRegion.append(x)
-        centerYRegion.append(y)
-        centerRRegion.append(r)
-        grey_ampRegion.append(grey_img[int(y), int(x)])
+        point_det.append((x, y, r))
 
-    xindx = int(centerXRegion[np.argmin(grey_ampRegion)])
-    yindx = int(centerYRegion[np.argmin(grey_ampRegion)])
+    point_det = sorted(
+        point_det, key=itemgetter(2), reverse=True
+    )  # here we sort by the radius of the dot bigger dots are around the center and edges
+    print(point_det,point_det[0][0],point_det[0][1])
+
+
+
+    xindx = int(point_det[0][0])  #using this in case more points are found
+    yindx = int(point_det[0][1])
     # rindx = int(centerRRegion[np.argmin(grey_ampRegion)])
 
-    detCenterXRegion = xindx
-    detCenterYRegion = yindx
-
-    return detCenterXRegion, detCenterYRegion
+    return xindx, yindx
 
 
 # def read_dicom(filename1,filename2,ioption):
@@ -507,22 +516,24 @@ def read_dicom(directory):
 
 
 
-    ax_g0c90.scatter(
+    g0=ax_g0c90.scatter(
             x_g0 * dx, (ArrayDicom[:, :, i].shape[0] - y_g0) * dy, label='g=0'
         )  # perfect!
 
-    ax_g0c90.scatter(
+    g90=ax_g0c90.scatter(
             x_g90 * dx, (ArrayDicom[:, :, i].shape[0] - y_g90) * dy, label='g=90'
         )  # perfect!
-    ax_g0c90.scatter(
+    g180=ax_g0c90.scatter(
             x_g180 * dx, (ArrayDicom[:, :, i].shape[0] - y_g180) * dy, label='g=180'
         )  # perfect!
-    ax_g0c90.scatter(
+    g270=ax_g0c90.scatter(
             x_g270 * dx, (ArrayDicom[:, :, i].shape[0] - y_g270) * dy, label='g=270'
         )  # perfect!
 
         # print(list_title[i], "center_g0c90=", center_g0c90, "center=", center, dist)
-    ax_g0c90.legend(bbox_to_anchor=(1.25, 1), loc=2, borderaxespad=0.0)
+    extra = Rectangle((0, 0), 1, 1, fc="w", fill=False, edgecolor='none', linewidth=0)
+
+    ax_g0c90.legend([extra,extra,g0,g90,g180,g270],("Maximum delta x =" + str(round(max_deltax*dx,4)) + " mm","Maximum delta y =" + str(round(max_deltay*dy,4)) + " mm","g0","g90","g180","g270"),bbox_to_anchor=(1.25, 1), loc=2, borderaxespad=0.0)
 
 
 
@@ -533,24 +544,22 @@ def read_dicom(directory):
     #     xytext=(point_sel[imin, 0] * dx, point_sel[imin, 1] * dy),
     #     arrowprops=dict(arrowstyle="<->", color="r"),
     # )  # example on how to plot a double headed arrow
-    ax_g0c90.text(
-        (width // 2.15) * dx,
-        (height // 2.15) * dy,
-        "Maximum delta x =" + str(round(max_deltax*dx,4)) + " mm",
-        rotation=0,
-        fontsize=14,
-        color="r",
-    )
-    ax_g0c90.text(
-        (width // 2.15) * dx,
-        (height // 2.18) * dy,
-        "Maximum delta y =" + str(round(max_deltay*dy,4)) + " mm",
-        rotation=0,
-        fontsize=14,
-        color="r",
-    )
-
-
+    # ax_g0c90.text(
+    #     (width // 2.15) * dx,
+    #     (height // 2.15) * dy,
+    #     "Maximum delta x =" + str(round(max_deltax*dx,4)) + " mm",
+    #     rotation=0,
+    #     fontsize=14,
+    #     color="r",
+    # )
+    # ax_g0c90.text(
+    #     (width // 2.15) * dx,
+    #     (height // 2.18) * dy,
+    #     "Maximum delta y =" + str(round(max_deltay*dy,4)) + " mm",
+    #     rotation=0,
+    #     fontsize=14,
+    #     color="r",
+    # )
 
 
 
