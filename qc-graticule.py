@@ -173,7 +173,10 @@ def scalingAnalysis(ArrayDicom_o, dx, dy,title):  # determine scaling
         / 10.0
     )
 
+    diff_distance = 10*(distance-10)
+    
     print("distance=", distance, "cm")  # distance is reported in cm
+    print("difference=", diff_distance, "mm")  # distance is reported in cm
 
 
 
@@ -212,7 +215,7 @@ def scalingAnalysis(ArrayDicom_o, dx, dy,title):  # determine scaling
     )
 
 
-    return distance, fig
+    return distance, diff_distance, fig
 
 
 
