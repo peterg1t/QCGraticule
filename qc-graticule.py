@@ -215,7 +215,7 @@ def scalingAnalysis(ArrayDicom_o, dx, dy,title):  # determine scaling
     )
 
 
-    return distance, diff_distance, fig
+    return distance, fig
 
 
 
